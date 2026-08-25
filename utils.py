@@ -1,79 +1,79 @@
-"""Utility functions for automation-tool-64.
-
-Cleaned up and reorganized common helpers.
-"""
-
-import os
+import time
+import random
 import json
-import logging
-from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import List, Dict, Any, Callable, Optional
 
-# File utilities
+def random_delay(min_seconds: float, max_seconds: float) -> None:
+    """Introduce a random delay for automation tasks.
 
-def ensure_directory(path: str) -> str:
-    """Ensure the directory exists."""
-    os.makedirs(path, exist_ok=True)
-    return os.path.abspath(path)
+    Helps mimic human interaction patterns.
 
-def list_files(directory: str, extension: Optional[str] = None) -> List[str]:
-    """List files optionally by extension."""
-    files = []
-    for root, _, filenames in os.walk(directory):
-        for name in filenames:
-            if not extension or name.endswith(extension):
-                files.append(os.path.join(root, name))
-    return files
+    Args:
+        min_seconds: Minimum delay duration in seconds.
+        max_seconds: Maximum delay duration in seconds.
+    """
+    delay: float = random.uniform(min_seconds, max_seconds)
+    time.sleep(delay)
 
-def cleanup_old_files(dir_path: str, days: int = 7) -> int:
-    """Clean files older than given days."""
-    if not os.path.isdir(dir_path):
-        return 0
-    cutoff = datetime.now().timestamp() - days * 86400
-    count = 0
-    for root, _, files in os.walk(dir_path):
-        for f in files:
-            fp = os.path.join(root, f)
-            if os.path.getmtime(fp) < cutoff:
-                try:
-                    os.remove(fp)
-                    count += 1
-                except OSError:
-                    pass
-    return count
+def load_json_config(config_path: str) -> Dict[str, Any]:
+    """Load configuration from a JSON file.
 
-# JSON utilities
+    Args:
+        config_path: Path to the JSON configuration file.
 
-def load_json(path: str) -> Dict[str, Any]:
-    """Load JSON or empty dict."""
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    Returns:
+        Parsed configuration as a dictionary.
+    """
+    with open(config_path, 'r', encoding='utf-8') as config_file:
+        return json.load(config_file)
 
-def save_json(data: Dict[str, Any], path: str) -> bool:
-    """Save data to JSON file."""
-    try:
-        ensure_directory(os.path.dirname(path) or ".")
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2)
-        return True
-    except Exception:
-        return False
+def filter_items(items: List[str], predicate: Callable[[str], bool]) -> List[str]:
+    """Filter items using a predicate function.
 
-# Misc utilities
+    Args:
+        items: List of items to filter.
+        predicate: Function that returns True for items to include.
 
-def get_timestamp() -> str:
-    """Get current timestamp string."""
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    Returns:
+        Filtered list of items.
+    """
+    # List comprehension for clean filtering
+    return [item for item in items if predicate(item)]
 
-def setup_logger(name: str = "automation") -> logging.Logger:
-    """Configure logger."""
-    log = logging.getLogger(name)
-    if not log.handlers:
-        h = logging.StreamHandler()
-        h.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
-        log.addHandler(h)
-    log.setLevel(logging.INFO)
-    return log
+def create_batches(items: List[Any], size: int = 5) -> List[List[Any]]:
+    """Divide items into batches of given size.
+
+    Args:
+        items: The list of items to batch.
+        size: Size of each batch.
+
+    Returns:
+        List of batches, each a sublist.
+    """
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+def retry_operation(func: Callable[[], Any], max_attempts: int = 3, delay: float = 1.0) -> Any:
+    """Retry a function call up to max_attempts on exceptions.
+
+    Args:
+        func: Zero-argument function to call.
+        max_attempts: Maximum number of attempts.
+        delay: Seconds to wait between retries.
+
+    Returns:
+        The result from func if successful.
+
+    Raises:
+        The last exception if all attempts fail.
+    """
+    last_exception: Optional[Exception] = None
+    for attempt in range(max_attempts):
+        try:
+            return func()
+        except Exception as e:
+            last_exception = e
+            if attempt < max_attempts - 1:
+                time.sleep(delay)
+    if last_exception:
+        raise last_exception
+    raise Exception("No attempts were made")
