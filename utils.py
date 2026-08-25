@@ -1,41 +1,79 @@
+"""Utility functions for automation-tool-64.
+
+Cleaned up and reorganized common helpers.
+"""
+
 import os
 import json
+import logging
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, Optional, List
 
-# Utility functions reorganized for better readability and maintainability
+# File utilities
 
-def load_json_config(filepath: str) -> Dict[str, Any]:
-    """Load and return JSON configuration from file."""
-    if not os.path.exists(filepath):
+def ensure_directory(path: str) -> str:
+    """Ensure the directory exists."""
+    os.makedirs(path, exist_ok=True)
+    return os.path.abspath(path)
+
+def list_files(directory: str, extension: Optional[str] = None) -> List[str]:
+    """List files optionally by extension."""
+    files = []
+    for root, _, filenames in os.walk(directory):
+        for name in filenames:
+            if not extension or name.endswith(extension):
+                files.append(os.path.join(root, name))
+    return files
+
+def cleanup_old_files(dir_path: str, days: int = 7) -> int:
+    """Clean files older than given days."""
+    if not os.path.isdir(dir_path):
+        return 0
+    cutoff = datetime.now().timestamp() - days * 86400
+    count = 0
+    for root, _, files in os.walk(dir_path):
+        for f in files:
+            fp = os.path.join(root, f)
+            if os.path.getmtime(fp) < cutoff:
+                try:
+                    os.remove(fp)
+                    count += 1
+                except OSError:
+                    pass
+    return count
+
+# JSON utilities
+
+def load_json(path: str) -> Dict[str, Any]:
+    """Load JSON or empty dict."""
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
         return {}
-    with open(filepath, 'r', encoding='utf-8') as file:
-        return json.load(file)
 
-def save_json_config(filepath: str, data: Dict[str, Any]) -> None:
-    """Save dictionary data to JSON file with formatting."""
-    with open(filepath, 'w', encoding='utf-8') as file:
-        json.dump(data, file, indent=4)
+def save_json(data: Dict[str, Any], path: str) -> bool:
+    """Save data to JSON file."""
+    try:
+        ensure_directory(os.path.dirname(path) or ".")
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+        return True
+    except Exception:
+        return False
 
-def get_current_timestamp() -> str:
-    """Return formatted current date and time."""
-    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+# Misc utilities
 
-def sanitize_input(text: str) -> str:
-    """Clean input string by keeping only alphanumeric and spaces."""
-    return ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
+def get_timestamp() -> str:
+    """Get current timestamp string."""
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-def split_into_chunks(items: List[Any], chunk_size: int) -> List[List[Any]]:
-    """Divide a list into smaller chunks of specified size."""
-    return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
-
-def create_directory_if_missing(path: str) -> None:
-    """Ensure the given directory path exists, creating it if needed."""
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-def merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge two dictionaries, with dict2 overriding dict1."""
-    result = dict1.copy()
-    result.update(dict2)
-    return result
+def setup_logger(name: str = "automation") -> logging.Logger:
+    """Configure logger."""
+    log = logging.getLogger(name)
+    if not log.handlers:
+        h = logging.StreamHandler()
+        h.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        log.addHandler(h)
+    log.setLevel(logging.INFO)
+    return log
