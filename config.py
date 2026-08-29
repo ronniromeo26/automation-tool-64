@@ -1,77 +1,72 @@
 import json
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+import os
+from typing import Any, Dict, Optional
 
-class Config:
-    """Configuration handler for automation-tool-64.
+class ConfigLoader:
+    # Default configuration values for the automation tool
+    DEFAULTS: Dict[str, Any] = {
+        "timeout": 30,
+        "retries": 3,
+        "log_level": "INFO",
+        "output_dir": "./output",
+        "verbose": False,
+        "max_workers": 4
+    }
 
-    Provides typed access to settings with load and save.
-    """
-
-    def __init__(self, config_file: Optional[str] = None) -> None:
-        """Initialize config with file path.
-
-        Args:
-            config_file: Path to JSON config.
-        """
-
-        self.config_file: Path = Path(config_file) if config_file is not None else Path("config.json")
-        self.data: Dict[str, Any] = {}
+    def __init__(self, config_path: str = "config.json") -> None:
+        """Initialize the configuration loader."""
+        self.config_path = config_path
+        self.config: Dict[str, Any] = {}
         self._load()
 
     def _load(self) -> None:
-        """Load from file or use defaults."""
-
-        if self.config_file.exists():
-            with open(self.config_file, "r", encoding="utf-8") as f:
-                self.data = json.load(f)
-        else:
-            self.data = {"name": "automation-tool-64", "max_workers": 4, "timeout": 30}
+        """Load configuration from file, falling back to defaults."""
+        self.config = self.DEFAULTS.copy()
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    user_config = json.load(f)
+                    if isinstance(user_config, dict):
+                        self.config.update(user_config)
+            except Exception:
+                # Ignore errors and use defaults
+                pass
 
     def get(self, key: str, default: Optional[Any] = None) -> Any:
-        """Get value for key.
-
-        Args:
-            key: Setting key.
-            default: Default if absent.
-        Returns:
-            Value or default.
-        """
-
-        return self.data.get(key, default)
+        """Get a value from config or return provided default."""
+        return self.config.get(key, default)
 
     def set(self, key: str, value: Any) -> None:
-        """Set value for key.
+        """Set a value in the current config."""
+        self.config[key] = value
 
-        Args:
-            key: Setting key.
-            value: New value.
-        """
+    def save(self) -> bool:
+        """Save the current config to the file. Returns success status."""
+        try:
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                json.dump(self.config, f, indent=2)
+            return True
+        except Exception:
+            return False
 
-        self.data[key] = value
+    def get_all(self) -> Dict[str, Any]:
+        """Return a copy of all configuration values."""
+        return self.config.copy()
 
-    def save(self) -> None:
-        """Persist data to config file."""
+    def reset_to_defaults(self) -> None:
+        """Reset config to default values."""
+        self.config = self.DEFAULTS.copy()
 
-        with open(self.config_file, "w", encoding="utf-8") as f:
-            json.dump(self.data, f, indent=2)
-
-    def get_tasks(self) -> List[str]:
-        """Get task list if present.
-
-        Returns:
-            List of tasks.
-        """
-
-        return self.get("tasks", [])
-
-def load_config(path: Optional[str] = None) -> Config:
-    """Create config from optional path.
-
-    Args:
-        path: Config file location.
-    Returns:
-        Config instance.
-    """
-
-    return Config(path)
+# Example usage to demonstrate the loader
+if __name__ == "__main__":
+    # Create loader instance
+    config = ConfigLoader("my_config.json")
+    # Get some values
+    print("Timeout:", config.get("timeout"))
+    print("Log level:", config.get("log_level"))
+    # Modify and save
+    config.set("verbose", True)
+    if config.save():
+        print("Configuration saved.")
+    # Get all
+    print("Full config:", config.get_all())
