@@ -1,66 +1,77 @@
 import json
-import os
-from typing import Any, Dict
-
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 class Config:
-    """Configuration loader with support for defaults and file overrides."""
+    """Configuration handler for automation-tool-64.
 
-    DEFAULTS: Dict[str, Any] = {
-        "debug": False,
-        "log_level": "INFO",
-        "timeout": 30,
-        "max_workers": 4,
-        "input_dir": "input",
-        "output_dir": "output",
-        "retry_attempts": 3,
-        "features": ["core"],
-    }
+    Provides typed access to settings with load and save.
+    """
 
-    def __init__(self, config_file: str = "config.json") -> None:
-        self.config_file = config_file
-        self._config = self._load()
+    def __init__(self, config_file: Optional[str] = None) -> None:
+        """Initialize config with file path.
 
-    def _load(self) -> Dict[str, Any]:
-        """Load config from file, falling back to defaults."""
-        config = self.DEFAULTS.copy()
-        if os.path.exists(self.config_file):
-            try:
-                with open(self.config_file, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                    config.update(loaded)
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Warning: Failed to load {self.config_file}: {e}")
-        # Fill in any missing defaults
-        for key, value in self.DEFAULTS.items():
-            if key not in config:
-                config[key] = value
-        return config
+        Args:
+            config_file: Path to JSON config.
+        """
 
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get a config value or default."""
-        return self._config.get(key, default)
+        self.config_file: Path = Path(config_file) if config_file is not None else Path("config.json")
+        self.data: Dict[str, Any] = {}
+        self._load()
+
+    def _load(self) -> None:
+        """Load from file or use defaults."""
+
+        if self.config_file.exists():
+            with open(self.config_file, "r", encoding="utf-8") as f:
+                self.data = json.load(f)
+        else:
+            self.data = {"name": "automation-tool-64", "max_workers": 4, "timeout": 30}
+
+    def get(self, key: str, default: Optional[Any] = None) -> Any:
+        """Get value for key.
+
+        Args:
+            key: Setting key.
+            default: Default if absent.
+        Returns:
+            Value or default.
+        """
+
+        return self.data.get(key, default)
 
     def set(self, key: str, value: Any) -> None:
-        """Update a config value in memory."""
-        self._config[key] = value
+        """Set value for key.
+
+        Args:
+            key: Setting key.
+            value: New value.
+        """
+
+        self.data[key] = value
 
     def save(self) -> None:
-        """Write current config to the file."""
-        try:
-            with open(self.config_file, "w", encoding="utf-8") as f:
-                json.dump(self._config, f, indent=4)
-        except IOError as e:
-            print(f"Error: Could not save config to {self.config_file}: {e}")
+        """Persist data to config file."""
 
-    def __getitem__(self, key: str) -> Any:
-        if key in self._config:
-            return self._config[key]
-        raise KeyError(f"Config key not found: {key}")
+        with open(self.config_file, "w", encoding="utf-8") as f:
+            json.dump(self.data, f, indent=2)
 
-    def __setitem__(self, key: str, value: Any) -> None:
-        self._config[key] = value
+    def get_tasks(self) -> List[str]:
+        """Get task list if present.
 
-    def as_dict(self) -> Dict[str, Any]:
-        """Return copy of full configuration."""
-        return self._config.copy()
+        Returns:
+            List of tasks.
+        """
+
+        return self.get("tasks", [])
+
+def load_config(path: Optional[str] = None) -> Config:
+    """Create config from optional path.
+
+    Args:
+        path: Config file location.
+    Returns:
+        Config instance.
+    """
+
+    return Config(path)
