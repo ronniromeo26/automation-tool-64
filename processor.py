@@ -1,42 +1,60 @@
 import json
-import logging
-from typing import Any, Dict, Optional
+from typing import List, Dict, Any
 
-logger = logging.getLogger(__name__)
+class Processor:
+    """Handles data processing and cleanup tasks."""
 
-class ProcessingError(Exception):
-    """Custom exception for data processing errors."""
-    pass
+    def __init__(self, input_data: List[Dict[str, Any]]):
+        self.input_data = input_data
+        self.output_data: List[Dict[str, Any]] = []
 
-def safe_process_payload(raw_data: Optional[str]) -> Dict[str, Any]:
-    """Process raw JSON string input with robust error handling for edge cases."""
-    if raw_data is None:
-        logger.warning("Received null payload for processing")
-        return {"status": "ignored", "reason": "null_input"}
+    def validate_entry(self, entry: Dict[str, Any]) -> bool:
+        """Check if entry has required fields."""
+        required = ['id', 'name', 'value']
+        return all(key in entry for key in required) and isinstance(entry.get('value'), (int, float))
 
-    if not isinstance(raw_data, str):
-        logger.error("Invalid payload type: expected string, got %s", type(raw_data))
-        raise ProcessingError("Payload must be a string")
+    def clean_data(self) -> None:
+        """Remove invalid entries and normalize data."""
+        for entry in self.input_data:
+            if self.validate_entry(entry):
+                cleaned = {
+                    'id': entry['id'],
+                    'name': entry['name'].strip().lower(),
+                    'value': float(entry['value'])
+                }
+                self.output_data.append(cleaned)
 
-    if not raw_data.strip():
-        logger.warning("Received empty string payload")
-        return {"status": "ignored", "reason": "empty_input"}
+    def transform_data(self) -> None:
+        """Apply transformations to cleaned data."""
+        for entry in self.output_data:
+            entry['value'] *= 1.1  # apply 10% increase
+            entry['processed'] = True
 
-    try:
-        parsed_data = json.loads(raw_data)
-    except json.JSONDecodeError as err:
-        logger.error("Failed to parse JSON payload: %s", err)
-        raise ProcessingError(f"Invalid JSON format: {err}") from err
+    def get_results(self) -> List[Dict[str, Any]]:
+        """Return the processed data."""
+        return self.output_data
 
-    if not isinstance(parsed_data, dict):
-        logger.error("Parsed JSON is not a dictionary: %s", type(parsed_data))
-        raise ProcessingError("Payload root must be a JSON object")
+    def save_results(self, filepath: str) -> None:
+        """Save processed data to JSON file."""
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(self.output_data, f, indent=2, ensure_ascii=False)
 
-    result = {
-        "status": "success",
-        "data": parsed_data,
-        "item_count": len(parsed_data)
-    }
-    
-    logger.info("Successfully processed payload with %d items", result["item_count"])
-    return result
+def run_processing(data: List[Dict[str, Any]], output_file: str = 'processed.json') -> List[Dict[str, Any]]:
+    """Main function to run the processor."""
+    proc = Processor(data)
+    proc.clean_data()
+    proc.transform_data()
+    results = proc.get_results()
+    proc.save_results(output_file)
+    return results
+
+# Example usage
+if __name__ == '__main__':
+    sample_data = [
+        {'id': 1, 'name': ' Item One ', 'value': 100},
+        {'id': 2, 'name': 'Item Two', 'value': 'invalid'},
+        {'id': 3, 'name': 'Item Three', 'value': 300},
+    ]
+    processed = run_processing(sample_data)
+    print(f"Processed {len(processed)} items")
+    print(json.dumps(processed, indent=2))
