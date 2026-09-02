@@ -1,48 +1,57 @@
+import os
 import time
-from functools import lru_cache
-from typing import List, Dict, Any
+from typing import List, Callable, Any
 
-class CoreEngine:
-    """Core processing engine optimized for performance."""
+class AutomationCore:
+    def __init__(self) -> None:
+        self.tasks: List[Callable[[], Any]] = []
+        self.results: List[Any] = []
 
-    def __init__(self, cache_size: int = 256):
-        self.cache_size = cache_size
-        self._cache: Dict[str, Any] = {}
+    def add_task(self, task: Callable[[], Any]) -> None:
+        # Add a callable task to the list
+        if callable(task):
+            self.tasks.append(task)
 
-    @lru_cache(maxsize=256)
-    def _compute_heavy(self, key: str) -> float:
-        """Simulate heavy computation. Caching avoids recomputation."""
-        time.sleep(0.01)
-        return hash(key) % 1000 / 100.0
+    def run_all(self) -> None:
+        # Execute each task sequentially with basic error handling
+        for index, task in enumerate(self.tasks, 1):
+            print(f"Starting task {index}")
+            try:
+                result = task()
+                self.results.append(result)
+                print(f"Task {index} succeeded")
+            except Exception as error:
+                print(f"Task {index} failed with error: {error}")
+                self.results.append(None)
 
-    def process_data(self, data_items: List[Dict[str, Any]]) -> List[float]:
-        """Process items using cached heavy computation."""
-        results = []
-        for item in data_items:
-            key = str(sorted(item.items()))
-            result = self._compute_heavy(key)
-            results.append(result)
-        return results
+    def get_summary(self) -> dict:
+        # Return a summary of execution
+        return {
+            "total_tasks": len(self.tasks),
+            "successful": len([r for r in self.results if r is not None]),
+            "results": self.results
+        }
 
-    def batch_process(self, all_data: List[List[Dict[str, Any]]]) -> List[List[float]]:
-        """Batch processing to minimize function call overhead."""
-        batch_results = []
-        for batch in all_data:
-            batch_results.append(self.process_data(batch))
-        return batch_results
+def create_file_task(filename: str, content: str) -> Callable[[], str]:
+    # Factory to create a task that writes to a file
+    def task() -> str:
+        with open(filename, 'w') as f:
+            f.write(content)
+        return f"Created {filename}"
+    return task
 
-
-def optimize_list(items: List[int]) -> List[int]:
-    """Optimized list processing using comprehension."""
-    return [x * 2 + 1 for x in items if x % 2 == 0]
-
+def main() -> None:
+    # Example usage of the core automation
+    core = AutomationCore()
+    core.add_task(lambda: time.sleep(0.1) or "Slept briefly")
+    core.add_task(create_file_task("temp.txt", "Automated content"))
+    core.add_task(lambda: "Final task completed")
+    core.run_all()
+    summary = core.get_summary()
+    print("Execution summary:", summary)
+    # Cleanup the temp file
+    if os.path.exists("temp.txt"):
+        os.remove("temp.txt")
 
 if __name__ == "__main__":
-    engine = CoreEngine()
-    sample = [{"id": i, "val": i**2} for i in range(50)]
-    start_time = time.time()
-    res = engine.process_data(sample)
-    elapsed = time.time() - start_time
-    print(f"Processed {len(sample)} items in {elapsed:.4f}s")
-    opt = optimize_list(list(range(100)))
-    print(f"Optimized list length: {len(opt)}")
+    main()
