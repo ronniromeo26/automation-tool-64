@@ -1,68 +1,49 @@
-import logging
-from typing import Any, Callable, Optional
+"""Custom exceptions for the automation tool.
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+This module defines the hierarchy of exceptions raised by the automation
+tool during configuration, validation, and task execution.
+"""
 
-logger = logging.getLogger('automation_tool')
+from typing import Any, Dict, Optional
+
 
 class AutomationError(Exception):
-    """Base exception class for the automation tool."""
-    def __init__(self, message: str, context: Optional[dict] = None) -> None:
-        self.message = message
-        self.context = context or {}
-        super().__init__(self.message)
+    """Base exception for all errors in automation-tool-64."""
 
-class InvalidConfigurationError(AutomationError):
-    """Raised when configuration has invalid values or missing keys."""
-    pass
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+        """Initialize the base automation exception.
 
-class EdgeCaseInputError(AutomationError):
-    """Raised for unexpected input values like empty lists or zero values."""
-    pass
+        Args:
+            message: A human-readable error message.
+            details: Optional metadata or context surrounding the error.
+        """
+        super().__init__(message)
+        self.message: str = message
+        self.details: Dict[str, Any] = details or {}
 
-class ResourceAccessError(AutomationError):
-    """Raised when accessing files, APIs or other resources fails."""
-    pass
+    def __str__(self) -> str:
+        if self.details:
+            return f"{self.message} (Details: {self.details})"
+        return self.message
 
-class ProcessingTimeoutError(AutomationError):
-    """Raised when an operation takes too long to complete."""
-    pass
 
-def handle_edge_cases(operation: Callable[[], Any], retries: int = 2) -> Any:
-    """Wrapper function to handle various edge cases with retries.
-    Handles invalid inputs, timeouts, resource errors.
-    """
-    for attempt in range(retries + 1):
-        try:
-            result = operation()
-            if result is None:
-                raise EdgeCaseInputError("Operation returned None, which is invalid")
-            if isinstance(result, (list, dict)) and len(result) == 0:
-                raise EdgeCaseInputError("Empty result from operation")
-            return result
-        except (InvalidConfigurationError, EdgeCaseInputError) as e:
-            logger.error(f"Edge case error: {e.message} | Context: {e.context}")
-            raise
-        except ProcessingTimeoutError as e:
-            logger.warning(f"Timeout on attempt {attempt + 1}: {e.message}")
-            if attempt == retries:
-                raise AutomationError("Max retries exceeded for timeout", e.context)
-            continue
-        except Exception as e:
-            logger.error(f"Unexpected error during operation: {str(e)}")
-            if attempt == retries:
-                raise AutomationError(f"Failed after {retries + 1} attempts", {"original_error": str(e)})
-            continue
-    raise AutomationError("Operation failed without specific error")
+class ConfigurationError(AutomationError):
+    """Exception raised when configuration parameters are invalid or missing."""
 
-def example_operation() -> int:
-    """Example function that might hit edge cases."""
-    import random
-    value = random.choice([0, 5, None, []])
-    if value == 0:
-        raise EdgeCaseInputError("Zero value encountered", {"value": value})
-    if value is None:
-        raise InvalidConfigurationError("None value in config")
-    if value == []:
-        raise ResourceAccessError("Empty list from resource")
-    return value
+
+class TaskExecutionError(AutomationError):
+    """Exception raised when an automation task fails during run."""
+
+    def __init__(
+        self, message: str, task_name: str, details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the task execution exception with task context."""
+        extended_details = {"task_name": task_name}
+        if details:
+            extended_details.update(details)
+        super().__init__(message, details=extended_details)
+        self.task_name: str = task_name
+
+
+class ValidationError(AutomationError):
+    """Exception raised when input data or state validation fails."""
