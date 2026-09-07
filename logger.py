@@ -1,31 +1,39 @@
 import logging
-from logging.handlers import RotatingFileHandler
-import os
+import functools
+from datetime import datetime
 
-def setup_logger(name: str, log_file: str = 'automation.log', level: int = logging.INFO):
-    """
-    Configures a rotating file logger for the automation tool.
-    """
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+# Configure global logger for automation-tool-64
+logger = logging.getLogger('automation-tool-64')
+logger.setLevel(logging.INFO)
 
-    # Prevent duplicate handlers if setup is called multiple times
-    if not logger.handlers:
-        # Max file size 5MB, keep 3 backup files
-        handler = RotatingFileHandler(
-            log_file, maxBytes=5*1024*1024, backupCount=3
-        )
-        
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        handler.setFormatter(formatter)
-        
-        logger.addHandler(handler)
-        
-        # Add console output for development visibility
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+# Memoization cache for performance improvement
+_performance_cache = {}
 
-    return logger
+def memoize_performance(func):
+    """Decorator to cache function results and avoid redundant processing."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _performance_cache:
+            _performance_cache[key] = func(*args, **kwargs)
+        return _performance_cache[key]
+    return wrapper
+
+class AutomationLogger:
+    def __init__(self, name):
+        self.logger = logging.getLogger(name)
+
+    @memoize_performance
+    def log_event(self, message: str, level: str = 'info'):
+        """Standardized logging entry with caching capability."""
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        formatted_msg = f"[{timestamp}] {message}"
+        
+        if level == 'info':
+            self.logger.info(formatted_msg)
+        elif level == 'error':
+            self.logger.error(formatted_msg)
+        return True
+
+# Instantiate singleton for global usage
+app_logger = AutomationLogger('core-module')
