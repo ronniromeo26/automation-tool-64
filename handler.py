@@ -1,36 +1,51 @@
-from typing import List, Dict, Any, Optional
+import os
+import json
+import shutil
 import logging
+import time
+from typing import Any, Dict, Optional
 
-# Configure logger for automation-tool-64 operations
 logger = logging.getLogger(__name__)
 
-class TaskHandler:
-    def __init__(self, target_node: str, timeout: int = 30) -> None:
-        """Initialize the handler with target configuration."""
-        self.target_node: str = target_node
-        self.timeout: int = timeout
-        self.active_tasks: List[str] = []
+def safe_load_json(file_path: str) -> Dict[str, Any]:
+    """Safely loads a JSON file, returning an empty dict on failure."""
+    if not os.path.exists(file_path):
+        logger.warning(f"File not found: {file_path}")
+        return {}
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        logger.error(f"Failed to read JSON from {file_path}: {e}")
+        return {}
 
-    def process_payload(self, data: Dict[str, Any]) -> bool:
-        """Validate and dispatch automation payload to target."""
-        try:
-            if not data:
-                return False
-            
-            task_id: Optional[str] = data.get("id")
-            if task_id:
-                self.active_tasks.append(task_id)
-                logger.info(f"Processing task {task_id} for node {self.target_node}")
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Task processing failed: {str(e)}")
-            return False
+def ensure_directory(dir_path: str) -> bool:
+    """Creates a directory if it does not exist."""
+    try:
+        os.makedirs(dir_path, exist_ok=True)
+        return True
+    except OSError as e:
+        logger.error(f"Failed to create directory {dir_path}: {e}")
+        return False
 
-    def get_status(self) -> Dict[str, Any]:
-        """Retrieve current state of task queue."""
-        return {
-            "node": self.target_node,
-            "queue_length": len(self.active_tasks),
-            "status": "healthy"
-        }
+def archive_file(source_path: str, dest_dir: str) -> Optional[str]:
+    """Moves a file to an archive directory with a timestamp to prevent overwrites."""
+    if not os.path.isfile(source_path):
+        logger.error(f"Source file does not exist: {source_path}")
+        return None
+    
+    if not ensure_directory(dest_dir):
+        return None
+
+    filename = os.path.basename(source_path)
+    base, ext = os.path.splitext(filename)
+    timestamp = int(time.time())
+    new_filename = f"{base}_{timestamp}{ext}"
+    dest_path = os.path.join(dest_dir, new_filename)
+
+    try:
+        shutil.move(source_path, dest_path)
+        return dest_path
+    except OSError as e:
+        logger.error(f"Failed to move file to {dest_path}: {e}")
+        return None
