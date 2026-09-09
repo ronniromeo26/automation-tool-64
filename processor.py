@@ -1,34 +1,34 @@
 import json
-import os
-from datetime import datetime
 from typing import Any, Dict, Optional
 
-def read_json_file(path: str) -> Dict[str, Any]:
-    """Reads and parses a JSON file into a dictionary."""
-    if not os.path.exists(path):
-        return {}
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def clean_data(data: Any) -> Any:
+    """Recursively strips whitespace from string values in nested dicts/lists."""
+    if isinstance(data, dict):
+        return {k: clean_data(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [clean_data(item) for item in data]
+    elif isinstance(data, str):
+        return data.strip()
+    return data
 
-def write_json_file(path: str, data: Dict[str, Any]) -> None:
-    """Serializes dictionary data into a JSON file."""
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=4)
+def safe_load_json(file_path: str) -> Optional[Dict[str, Any]]:
+    """Safely loads and cleans a JSON file."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            raw_data = json.load(f)
+            return clean_data(raw_data)
+    except (json.JSONDecodeError, FileNotFoundError, IOError):
+        return None
 
-def format_timestamp() -> str:
-    """Generates an ISO format timestamp for logging."""
-    return datetime.now().isoformat()
+def format_output(data: Any, indent: int = 4) -> str:
+    """Serializes data to a formatted JSON string."""
+    try:
+        return json.dumps(data, indent=indent, sort_keys=True)
+    except (TypeError, ValueError):
+        return str(data)
 
-def get_env_variable(key: str, default: Optional[str] = None) -> str:
-    """Retrieves environment variable with fallback default."""
-    return os.environ.get(key, default or "")
-
-def sanitize_filename(name: str) -> str:
-    """Removes invalid characters from file names."""
-    keepcharacters = (' ', '.', '_', '-')
-    return "".join(c for c in name if c.isalnum() or c in keepcharacters).strip()
-
-def batch_process(items: list, chunk_size: int = 10):
-    """Yields successive chunks from a list."""
-    for i in range(0, len(items), chunk_size):
-        yield items[i:i + chunk_size]
+if __name__ == "__main__":
+    # Example usage for testing data pipeline utilities
+    sample = {" key1 ": " value1 ", "nested": [" item1 ", " item2 "]}
+    cleaned = clean_data(sample)
+    print(format_output(cleaned))
