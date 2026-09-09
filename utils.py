@@ -1,45 +1,44 @@
-from typing import Any, Dict, List, Union
+import functools
+import time
+import logging
+from typing import Callable, Any
 
+# Configure logger for core operations
+logger = logging.getLogger('automation-tool-64')
 
-def flatten_dict(
-    d: Dict[str, Any], parent_key: str = "", sep: str = "_"
-) -> Dict[str, Any]:
-    """Flattens a nested dictionary into a single-level dictionary."""
-    items: List[tuple] = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        elif isinstance(v, list):
-            for i, item in enumerate(v):
-                list_key = f"{new_key}{sep}{i}"
-                if isinstance(item, dict):
-                    items.extend(flatten_dict(item, list_key, sep=sep).items())
-                else:
-                    items.append((list_key, item))
-        else:
-            items.append((new_key, v))
-    return dict(items)
+def memoize_with_ttl(ttl_seconds: int = 300):
+    """Performance decorator for caching function results with TTL."""
+    def decorator(func: Callable):
+        cache = {}
 
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, frozenset(kwargs.items()))
+            now = time.time()
+            
+            if key in cache:
+                result, timestamp = cache[key]
+                if now - timestamp < ttl_seconds:
+                    return result
+            
+            result = func(*args, **kwargs)
+            cache[key] = (result, now)
+            return result
+        return wrapper
+    return decorator
 
-def deep_get(
-    data: Dict[str, Any], keys: Union[str, List[str]], default: Any = None
-) -> Any:
-    """Safely retrieves a nested value from a dictionary using a key path."""
-    if isinstance(keys, str):
-        keys = keys.split(".")
+def batch_process(items: list, batch_size: int = 100):
+    """Generator for memory-efficient batch processing."""
+    for i in range(0, len(items), batch_size):
+        yield items[i:i + batch_size]
 
-    current = data
-    for key in keys:
-        if isinstance(current, dict):
-            current = current.get(key, default)
-        elif isinstance(current, list) and key.isdigit():
-            idx = int(key)
-            current = current[idx] if idx < len(current) else default
-        else:
-            return default
-
-        if current is default:
-            break
-
-    return current
+def timing_decorator(func: Callable):
+    """Logging decorator to monitor function execution duration."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        duration = time.perf_counter() - start
+        logger.debug(f'{func.__name__} executed in {duration:.4f}s')
+        return result
+    return wrapper
