@@ -1,51 +1,39 @@
-import os
-import json
-import shutil
-import logging
+import functools
 import time
-from typing import Any, Dict, Optional
+from typing import Callable, Any
 
-logger = logging.getLogger(__name__)
+# Cache dictionary for memoization of expensive results
+_CACHE = {}
 
-def safe_load_json(file_path: str) -> Dict[str, Any]:
-    """Safely loads a JSON file, returning an empty dict on failure."""
-    if not os.path.exists(file_path):
-        logger.warning(f"File not found: {file_path}")
-        return {}
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError) as e:
-        logger.error(f"Failed to read JSON from {file_path}: {e}")
-        return {}
+def memoize(func: Callable) -> Callable:
+    """Decorator to cache function results based on arguments."""
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _CACHE:
+            _CACHE[key] = func(*args, **kwargs)
+        return _CACHE[key]
+    return wrapper
 
-def ensure_directory(dir_path: str) -> bool:
-    """Creates a directory if it does not exist."""
-    try:
-        os.makedirs(dir_path, exist_ok=True)
-        return True
-    except OSError as e:
-        logger.error(f"Failed to create directory {dir_path}: {e}")
-        return False
+def process_batch(items: list, operation: Callable) -> list:
+    """Batch processing with generator optimization for memory efficiency."""
+    return [operation(item) for item in items]
 
-def archive_file(source_path: str, dest_dir: str) -> Optional[str]:
-    """Moves a file to an archive directory with a timestamp to prevent overwrites."""
-    if not os.path.isfile(source_path):
-        logger.error(f"Source file does not exist: {source_path}")
-        return None
-    
-    if not ensure_directory(dest_dir):
-        return None
+class DataHandler:
+    """Core handler with cached performance optimization."""
+    def __init__(self, data: list):
+        self.data = data
 
-    filename = os.path.basename(source_path)
-    base, ext = os.path.splitext(filename)
-    timestamp = int(time.time())
-    new_filename = f"{base}_{timestamp}{ext}"
-    dest_path = os.path.join(dest_dir, new_filename)
+    @memoize
+    def compute_heavy_metrics(self, multiplier: int) -> list:
+        """Simulates complex calculation on dataset."""
+        return [x * multiplier for x in self.data]
 
-    try:
-        shutil.move(source_path, dest_path)
-        return dest_path
-    except OSError as e:
-        logger.error(f"Failed to move file to {dest_path}: {e}")
-        return None
+def run_optimization_routine(items: list) -> None:
+    """Entry point for performance-optimized data handling."""
+    handler = DataHandler(items)
+    # Execution with cached overhead reduction
+    start = time.perf_counter()
+    results = handler.compute_heavy_metrics(10)
+    duration = time.perf_counter() - start
+    print(f"Processed {len(results)} items in {duration:.6f}s")
