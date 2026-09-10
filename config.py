@@ -1,29 +1,38 @@
-import os
 import json
+import os
 from typing import Any, Dict
 
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG: Dict[str, Any] = {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "debug": False,
     "timeout": 30,
-    "retries": 3,
-    "log_level": "INFO",
-    "enabled": True
+    "retry_limit": 3,
 }
 
-def load_config(config_path: str = "config.json") -> Dict[str, Any]:
-    """Loads configuration from file merging with defaults."""
-    config = DEFAULT_CONFIG.copy()
-    
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r") as f:
-                user_config = json.load(f)
-                config.update(user_config)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: failed to load config file: {e}")
-            
-    return config
+class ConfigLoader:
+    """Loads configuration from JSON files, falling back to default values."""
 
-def get_config_value(key: str, default_fallback: Any = None) -> Any:
-    """Helper to retrieve specific configuration value."""
-    config = load_config()
-    return config.get(key, default_fallback)
+    def __init__(self, filepath: str = "config.json") -> None:
+        self.filepath = filepath
+        self.config = DEFAULT_CONFIG.copy()
+
+    def load(self) -> Dict[str, Any]:
+        """Loads configuration from file and updates active settings."""
+        if not os.path.exists(self.filepath):
+            return self.config
+
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as f:
+                user_config = json.load(f)
+                if isinstance(user_config, dict):
+                    self.config.update(user_config)
+        except (json.JSONDecodeError, IOError):
+            # Fallback to default configuration on load errors
+            pass
+
+        return self.config
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Retrieves a specific configuration option with an optional override default."""
+        return self.config.get(key, default)
