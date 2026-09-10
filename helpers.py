@@ -1,29 +1,38 @@
-import json
-import os
-from typing import Any, Dict
+import re
 
-def load_config(config_path: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    loads json config file and merges with provided default values.
-    """
-    config = defaults.copy()
 
-    if not os.path.exists(config_path):
-        return config
+def validate_input(data: dict) -> bool:
+    """verify required schema and format for incoming data"""
+    required_fields = {"task_id": int, "action": str, "payload": dict}
+    
+    # ensure all keys exist and match type
+    for field, field_type in required_fields.items():
+        if field not in data or not isinstance(data[field], field_type):
+            return False
+    
+    # validate action string format
+    if not re.match(r"^[a-z_]+$", data["action"]):
+        return False
+        
+    return True
 
-    try:
-        with open(config_path, 'r') as f:
-            user_config = json.load(f)
-            if isinstance(user_config, dict):
-                config.update(user_config)
-    except (json.JSONDecodeError, IOError):
-        pass
 
-    return config
+def process_loop(stream):
+    """main ingestion loop with integrated validation"""
+    for entry in stream:
+        try:
+            if validate_input(entry):
+                # processing logic follows valid input
+                print(f"processing task: {entry['task_id']}")
+            else:
+                print(f"invalid input detected: {entry}")
+        except Exception as e:
+            print(f"unexpected failure: {e}")
 
-def save_config(config_path: str, config: Dict[str, Any]) -> None:
-    """
-    persists configuration dictionary to a json file.
-    """
-    with open(config_path, 'w') as f:
-        json.dump(config, f, indent=4)
+
+if __name__ == "__main__":
+    sample_data = [
+        {"task_id": 101, "action": "start", "payload": {}},
+        {"task_id": "invalid", "action": "fail", "payload": {}}
+    ]
+    process_loop(sample_data)
