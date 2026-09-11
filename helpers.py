@@ -1,38 +1,37 @@
-import re
+import os
+import shutil
+import time
+from typing import List
 
+def safe_delete_file(file_path: str) -> bool:
+    """Safely delete a file if it exists, returning True on success."""
+    try:
+        if os.path.isfile(file_path) or os.path.islink(file_path):
+            os.unlink(file_path)
+            return True
+    except Exception:
+        pass
+    return False
 
-def validate_input(data: dict) -> bool:
-    """verify required schema and format for incoming data"""
-    required_fields = {"task_id": int, "action": str, "payload": dict}
-    
-    # ensure all keys exist and match type
-    for field, field_type in required_fields.items():
-        if field not in data or not isinstance(data[field], field_type):
-            return False
-    
-    # validate action string format
-    if not re.match(r"^[a-z_]+$", data["action"]):
-        return False
-        
-    return True
+def clean_directory_by_age(directory_path: str, max_age_seconds: int) -> List[str]:
+    """Delete files in a directory that are older than max_age_seconds."""
+    deleted_files = []
+    if not os.path.isdir(directory_path):
+        return deleted_files
 
+    now = time.time()
+    for root, _, files in os.walk(directory_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            try:
+                stat = os.stat(file_path)
+                if now - stat.st_mtime > max_age_seconds:
+                    if safe_delete_file(file_path):
+                        deleted_files.append(file_path)
+            except OSError:
+                continue
+    return deleted_files
 
-def process_loop(stream):
-    """main ingestion loop with integrated validation"""
-    for entry in stream:
-        try:
-            if validate_input(entry):
-                # processing logic follows valid input
-                print(f"processing task: {entry['task_id']}")
-            else:
-                print(f"invalid input detected: {entry}")
-        except Exception as e:
-            print(f"unexpected failure: {e}")
-
-
-if __name__ == "__main__":
-    sample_data = [
-        {"task_id": 101, "action": "start", "payload": {}},
-        {"task_id": "invalid", "action": "fail", "payload": {}}
-    ]
-    process_loop(sample_data)
+def ensure_directory_exists(directory_path: str) -> None:
+    """Create directory if it does not already exist."""
+    os.makedirs(directory_path, exist_ok=True)
