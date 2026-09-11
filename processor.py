@@ -1,34 +1,70 @@
-import json
-from typing import Any, Dict, Optional
+import logging
+from typing import Any, Dict, List
 
-def clean_data(data: Any) -> Any:
-    """Recursively strips whitespace from string values in nested dicts/lists."""
-    if isinstance(data, dict):
-        return {k: clean_data(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [clean_data(item) for item in data]
-    elif isinstance(data, str):
-        return data.strip()
-    return data
+# Set up logger for tracking validation errors
+logger = logging.getLogger("automation_tool.processor")
 
-def safe_load_json(file_path: str) -> Optional[Dict[str, Any]]:
-    """Safely loads and cleans a JSON file."""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            raw_data = json.load(f)
-            return clean_data(raw_data)
-    except (json.JSONDecodeError, FileNotFoundError, IOError):
-        return None
 
-def format_output(data: Any, indent: int = 4) -> str:
-    """Serializes data to a formatted JSON string."""
-    try:
-        return json.dumps(data, indent=indent, sort_keys=True)
-    except (TypeError, ValueError):
-        return str(data)
+class DataProcessor:
+    """Handles the ingestion, validation, and processing of automation payloads."""
 
-if __name__ == "__main__":
-    # Example usage for testing data pipeline utilities
-    sample = {" key1 ": " value1 ", "nested": [" item1 ", " item2 "]}
-    cleaned = clean_data(sample)
-    print(format_output(cleaned))
+    def __init__(self) -> None:
+        self.success_count = 0
+        self.failure_count = 0
+
+    def validate_payload(self, payload: Any) -> Dict[str, Any]:
+        """Validates the structure and type of individual input payloads."""
+        if not isinstance(payload, dict):
+            raise TypeError("Payload must be a dictionary object")
+
+        required_keys = {"job_id", "action", "data"}
+        missing_keys = required_keys - payload.keys()
+        if missing_keys:
+            raise ValueError(f"Missing required fields: {', '.join(missing_keys)}")
+
+        if not isinstance(payload["job_id"], (int, str)):
+            raise TypeError("Field 'job_id' must be an integer or a string")
+
+        if not isinstance(payload["action"], str) or not payload["action"].strip():
+            raise ValueError("Field 'action' must be a non-empty string")
+
+        if not isinstance(payload["data"], dict):
+            raise TypeError("Field 'data' must be a dictionary")
+
+        return payload
+
+    def process_queue(self, queue: List[Any]) -> List[Dict[str, Any]]:
+        """Iterates through the queue, applying validation prior to task execution."""
+        successful_runs = []
+
+        for index, item in enumerate(queue):
+            try:
+                # Enforce input validation rules inside the main processing loop
+                valid_task = self.validate_payload(item)
+
+                job_id = valid_task["job_id"]
+                action_type = valid_task["action"].lower()
+                payload_data = valid_task["data"]
+
+                # Simulate execution of the validated command
+                execution_result = {
+                    "job_id": job_id,
+                    "status": "completed",
+                    "processed_action": action_type,
+                    "payload_size": len(payload_data),
+                }
+                successful_runs.append(execution_result)
+                self.success_count += 1
+
+            except (TypeError, ValueError) as validation_err:
+                self.failure_count += 1
+                logger.error(
+                    f"Item at index {index} failed validation: {validation_err}"
+                )
+            except Exception as system_err:
+                self.failure_count += 1
+                logger.error(
+                    f"Unexpected processing failure at index {index}: {system_err}"
+                )
+
+        return successful_runs
