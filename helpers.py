@@ -1,37 +1,42 @@
-import os
-import shutil
-import time
-from typing import List
+import json
+import logging
+from typing import Any, Dict, List, Optional
 
-def safe_delete_file(file_path: str) -> bool:
-    """Safely delete a file if it exists, returning True on success."""
+logger = logging.getLogger(__name__)
+
+
+def safe_json_loads(data: str, default: Optional[Any] = None) -> Any:
+    """Safely parse a JSON string, returning a default value on failure."""
+    if not isinstance(data, (str, bytes)):
+        logger.warning(f"Expected str or bytes for JSON parsing, got {type(data).__name__}")
+        return default
     try:
-        if os.path.isfile(file_path) or os.path.islink(file_path):
-            os.unlink(file_path)
-            return True
-    except Exception:
-        pass
-    return False
+        return json.loads(data)
+    except (json.JSONDecodeError, TypeError, UnicodeDecodeError) as err:
+        logger.error(f"Failed to parse JSON content: {err}")
+        return default
 
-def clean_directory_by_age(directory_path: str, max_age_seconds: int) -> List[str]:
-    """Delete files in a directory that are older than max_age_seconds."""
-    deleted_files = []
-    if not os.path.isdir(directory_path):
-        return deleted_files
 
-    now = time.time()
-    for root, _, files in os.walk(directory_path):
-        for file in files:
-            file_path = os.path.join(root, file)
-            try:
-                stat = os.stat(file_path)
-                if now - stat.st_mtime > max_age_seconds:
-                    if safe_delete_file(file_path):
-                        deleted_files.append(file_path)
-            except OSError:
-                continue
-    return deleted_files
+def get_nested_value(data: Dict[str, Any], keys: List[str], default: Optional[Any] = None) -> Any:
+    """Retrieve a value from nested dictionaries without raising KeyError."""
+    if not isinstance(data, dict):
+        return default
 
-def ensure_directory_exists(directory_path: str) -> None:
-    """Create directory if it does not already exist."""
-    os.makedirs(directory_path, exist_ok=True)
+    current = data
+    for key in keys:
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return default
+    return current
+
+
+def safe_cast_int(val: Any, default: int = 0) -> int:
+    """Safely convert an unknown value type to integer."""
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        logger.warning(f"Unable to convert '{val}' to integer, falling back to default")
+        return default
