@@ -1,44 +1,32 @@
-import functools
-import time
-import logging
-from typing import Callable, Any
+import json
+from typing import Any, Optional
 
-# Configure logger for core operations
-logger = logging.getLogger('automation-tool-64')
+def safe_load_json(file_path: str) -> Optional[dict]:
+    """Reads and parses a JSON file with error handling."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error reading {file_path}: {e}")
+        return None
 
-def memoize_with_ttl(ttl_seconds: int = 300):
-    """Performance decorator for caching function results with TTL."""
-    def decorator(func: Callable):
-        cache = {}
+def flatten_dict(d: dict, parent_key: str = '', sep: str = '_') -> dict:
+    """Flattens a nested dictionary into a single level."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
 
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            key = (args, frozenset(kwargs.items()))
-            now = time.time()
-            
-            if key in cache:
-                result, timestamp = cache[key]
-                if now - timestamp < ttl_seconds:
-                    return result
-            
-            result = func(*args, **kwargs)
-            cache[key] = (result, now)
-            return result
-        return wrapper
-    return decorator
-
-def batch_process(items: list, batch_size: int = 100):
-    """Generator for memory-efficient batch processing."""
-    for i in range(0, len(items), batch_size):
-        yield items[i:i + batch_size]
-
-def timing_decorator(func: Callable):
-    """Logging decorator to monitor function execution duration."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        start = time.perf_counter()
-        result = func(*args, **kwargs)
-        duration = time.perf_counter() - start
-        logger.debug(f'{func.__name__} executed in {duration:.4f}s')
-        return result
-    return wrapper
+def sanitize_data(data: Any) -> Any:
+    """Strips leading/trailing whitespace from string values."""
+    if isinstance(data, dict):
+        return {k: sanitize_data(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [sanitize_data(i) for i in data]
+    elif isinstance(data, str):
+        return data.strip()
+    return data
