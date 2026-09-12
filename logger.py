@@ -1,39 +1,42 @@
 import logging
-import functools
-from datetime import datetime
+from typing import Optional
 
-# Configure global logger for automation-tool-64
-logger = logging.getLogger('automation-tool-64')
-logger.setLevel(logging.INFO)
+def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
+    """
+    Configures and returns a logger instance for automation tasks.
 
-# Memoization cache for performance improvement
-_performance_cache = {}
+    Args:
+        name: The name of the module or process.
+        level: The logging threshold, defaults to INFO.
 
-def memoize_performance(func):
-    """Decorator to cache function results and avoid redundant processing."""
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        key = (func.__name__, args, frozenset(kwargs.items()))
-        if key not in _performance_cache:
-            _performance_cache[key] = func(*args, **kwargs)
-        return _performance_cache[key]
-    return wrapper
+    Returns:
+        A configured logging.Logger object.
+    """
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(level)
+    return logger
 
-class AutomationLogger:
-    def __init__(self, name):
-        self.logger = logging.getLogger(name)
+class TaskLogger:
+    """
+    Wrapper for logging automation task lifecycles.
+    """
+    def __init__(self, name: str) -> None:
+        self.logger = get_logger(name)
 
-    @memoize_performance
-    def log_event(self, message: str, level: str = 'info'):
-        """Standardized logging entry with caching capability."""
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        formatted_msg = f"[{timestamp}] {message}"
-        
-        if level == 'info':
-            self.logger.info(formatted_msg)
-        elif level == 'error':
-            self.logger.error(formatted_msg)
-        return True
+    def log_start(self, task_name: str) -> None:
+        """Logs the initiation of a specific automation task."""
+        self.logger.info(f"Starting task: {task_name}")
 
-# Instantiate singleton for global usage
-app_logger = AutomationLogger('core-module')
+    def log_error(self, message: str, exc: Optional[Exception] = None) -> None:
+        """Logs task failure with optional exception traceback."""
+        if exc:
+            self.logger.error(f"Error in task: {message} - {str(exc)}", exc_info=True)
+        else:
+            self.logger.error(f"Error in task: {message}")
