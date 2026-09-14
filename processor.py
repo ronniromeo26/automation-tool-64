@@ -1,70 +1,32 @@
+import time
 import logging
-from typing import Any, Dict, List
+from typing import Callable, Any
 
-# Set up logger for tracking validation errors
-logger = logging.getLogger("automation_tool.processor")
+logger = logging.getLogger(__name__)
 
+def with_retry(func: Callable, retries: int = 3, delay: float = 1.0) -> Any:
+    """Execute a callable with exponential backoff on failure."""
+    last_exception = None
+    
+    for attempt in range(retries):
+        try:
+            return func()
+        except (ConnectionError, TimeoutError) as e:
+            last_exception = e
+            wait_time = delay * (2 ** attempt)
+            logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+        except Exception as e:
+            logger.error(f"Unrecoverable error during execution: {e}")
+            raise e
+            
+    logger.error("Maximum retry attempts reached.")
+    raise last_exception if last_exception else Exception("Retry failed")
 
-class DataProcessor:
-    """Handles the ingestion, validation, and processing of automation payloads."""
-
-    def __init__(self) -> None:
-        self.success_count = 0
-        self.failure_count = 0
-
-    def validate_payload(self, payload: Any) -> Dict[str, Any]:
-        """Validates the structure and type of individual input payloads."""
-        if not isinstance(payload, dict):
-            raise TypeError("Payload must be a dictionary object")
-
-        required_keys = {"job_id", "action", "data"}
-        missing_keys = required_keys - payload.keys()
-        if missing_keys:
-            raise ValueError(f"Missing required fields: {', '.join(missing_keys)}")
-
-        if not isinstance(payload["job_id"], (int, str)):
-            raise TypeError("Field 'job_id' must be an integer or a string")
-
-        if not isinstance(payload["action"], str) or not payload["action"].strip():
-            raise ValueError("Field 'action' must be a non-empty string")
-
-        if not isinstance(payload["data"], dict):
-            raise TypeError("Field 'data' must be a dictionary")
-
-        return payload
-
-    def process_queue(self, queue: List[Any]) -> List[Dict[str, Any]]:
-        """Iterates through the queue, applying validation prior to task execution."""
-        successful_runs = []
-
-        for index, item in enumerate(queue):
-            try:
-                # Enforce input validation rules inside the main processing loop
-                valid_task = self.validate_payload(item)
-
-                job_id = valid_task["job_id"]
-                action_type = valid_task["action"].lower()
-                payload_data = valid_task["data"]
-
-                # Simulate execution of the validated command
-                execution_result = {
-                    "job_id": job_id,
-                    "status": "completed",
-                    "processed_action": action_type,
-                    "payload_size": len(payload_data),
-                }
-                successful_runs.append(execution_result)
-                self.success_count += 1
-
-            except (TypeError, ValueError) as validation_err:
-                self.failure_count += 1
-                logger.error(
-                    f"Item at index {index} failed validation: {validation_err}"
-                )
-            except Exception as system_err:
-                self.failure_count += 1
-                logger.error(
-                    f"Unexpected processing failure at index {index}: {system_err}"
-                )
-
-        return successful_runs
+def fetch_data(url: str):
+    """Simulated network operation wrapper."""
+    def operation():
+        # Placeholder for actual network logic
+        return {"status": "success", "url": url}
+    
+    return with_retry(operation)
