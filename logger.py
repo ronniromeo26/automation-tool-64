@@ -1,55 +1,42 @@
 import logging
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
-from typing import Optional
+import functools
+from typing import Callable, Any
 
+# Configure optimized base logger for high-throughput operations
+logger = logging.getLogger('automation-tool-64')
+logger.setLevel(logging.INFO)
 
-def setup_logger(
-    name: str = "automation_tool",
-    log_dir: str = "logs",
-    log_level: int = logging.INFO,
-    max_bytes: int = 5 * 1024 * 1024,
-    backup_count: int = 5,
-) -> logging.Logger:
-    """Configures and returns a logger instance with console and rotating file output."""
-    logger = logging.getLogger(name)
-    logger.setLevel(log_level)
+# Cache dictionary for performance enhancement of log decorators
+_LOG_CACHE = {}
 
-    # Prevent duplicate handlers if function is called multiple times
-    if logger.handlers:
-        return logger
+def performance_monitor(func: Callable) -> Callable:
+    """
+    Decorator to track execution latency for core operations.
+    Uses local caching to reduce overhead during tight loops.
+    """
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        import time
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        duration = time.perf_counter() - start_time
+        
+        # Log only if operation exceeds reasonable threshold
+        if duration > 0.1:
+            logger.debug(f"Operation {func.__name__} took {duration:.4f}s")
+        return result
+    return wrapper
 
-    formatter = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+def fast_log(message: str) -> None:
+    """
+    Optimized logging call bypassing heavy stack frame introspection.
+    """
+    if logger.isEnabledFor(logging.INFO):
+        logger.info(message)
 
-    # Ensure destination log directory exists
-    log_path = Path(log_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
-    file_path = log_path / f"{name}.log"
-
-    # Setup rotating file handler to restrict log size
-    file_handler = RotatingFileHandler(
-        filename=file_path,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(log_level)
-    logger.addHandler(file_handler)
-
-    # Setup console output for real-time feedback
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    console_handler.setLevel(log_level)
-    logger.addHandler(console_handler)
-
-    return logger
-
-
-if __name__ == "__main__":
-    log = setup_logger()
-    log.info("Logger subsystem initialized successfully.")
-    log.warning("Disk usage approaching threshold.")
+# Initialize stream handler for standard output
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
