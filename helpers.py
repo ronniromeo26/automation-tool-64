@@ -1,40 +1,37 @@
 import os
-import shutil
-import logging
-from typing import List
+import re
+import time
+from functools import wraps
+from typing import Callable, Any
 
-logger = logging.getLogger(__name__)
+def ensure_directory(path: str) -> None:
+    """Safely creates a directory path if it does not already exist."""
+    if not path:
+        return
+    os.makedirs(path, exist_ok=True)
 
-def clear_temp_directory(directory_path: str) -> bool:
-    """Removes all files within the specified temp directory."""
-    if not os.path.exists(directory_path):
-        return False
-    
-    try:
-        for filename in os.listdir(directory_path):
-            file_path = os.path.join(directory_path, filename)
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
-        return True
-    except OSError as e:
-        logger.error(f"failed to clean {directory_path}: {e}")
-        return False
+def slugify(text: str) -> str:
+    """Converts a string into a URL-friendly/file-friendly slug."""
+    text = text.lower().strip()
+    text = re.sub(r'[^a-z0-9\s-]', '', text)
+    text = re.sub(r'[\s-]+', '-', text)
+    return text.strip('-')
 
-def get_valid_file_paths(base_path: str, extensions: List[str]) -> List[str]:
-    """Filters files by extension in a given directory."""
-    valid_files = []
-    for root, _, files in os.walk(base_path):
-        for file in files:
-            if any(file.endswith(ext) for ext in extensions):
-                valid_files.append(os.path.join(root, file))
-    return valid_files
-
-def format_byte_size(size: int) -> str:
-    """Converts bytes to human readable format."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size < 1024:
-            return f"{size:.2f} {unit}"
-        size /= 1024
-    return f"{size:.2f} TB"
+def retry(retries: int = 3, delay: float = 1.0) -> Callable:
+    """Decorator to retry a function if it raises an exception."""
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            last_exception = None
+            current_delay = delay
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    if attempt < retries - 1:
+                        time.sleep(current_delay)
+                        current_delay *= 2
+            raise last_exception or RuntimeError("Function failed after retries")
+        return wrapper
+    return decorator
