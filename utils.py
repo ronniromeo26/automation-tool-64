@@ -1,32 +1,27 @@
-import json
-from typing import Any, Optional
+import time
+import functools
+import logging
 
-def safe_load_json(file_path: str) -> Optional[dict]:
-    """Reads and parses a JSON file with error handling."""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error reading {file_path}: {e}")
-        return None
+# Setup basic logging for the automation tool
+logger = logging.getLogger('automation-tool-64')
 
-def flatten_dict(d: dict, parent_key: str = '', sep: str = '_') -> dict:
-    """Flattens a nested dictionary into a single level."""
-    items = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
-
-def sanitize_data(data: Any) -> Any:
-    """Strips leading/trailing whitespace from string values."""
-    if isinstance(data, dict):
-        return {k: sanitize_data(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [sanitize_data(i) for i in data]
-    elif isinstance(data, str):
-        return data.strip()
-    return data
+def retry(max_attempts=3, delay=1, exceptions=(Exception,)):
+    """Decorator for retrying network operations on failure."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            while attempts < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    attempts += 1
+                    if attempts == max_attempts:
+                        logger.error(f"Final attempt {attempts} failed for {func.__name__}")
+                        raise
+                    
+                    sleep_time = delay * (2 ** (attempts - 1))
+                    logger.warning(f"Attempt {attempts} failed: {e}. Retrying in {sleep_time}s...")
+                    time.sleep(sleep_time)
+        return wrapper
+    return decorator
