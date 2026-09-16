@@ -1,42 +1,35 @@
 import logging
-import functools
-from typing import Callable, Any
+from logging.handlers import RotatingFileHandler
+import os
 
-# Configure optimized base logger for high-throughput operations
-logger = logging.getLogger('automation-tool-64')
-logger.setLevel(logging.INFO)
+def setup_logger(name='automation-tool-64', log_file='app.log', level=logging.INFO):
+    """Configures a rotating file logger for the application."""
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
 
-# Cache dictionary for performance enhancement of log decorators
-_LOG_CACHE = {}
+    # Prevent duplicate handlers if function is called multiple times
+    if not logger.handlers:
+        # Ensure log directory exists
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir)
 
-def performance_monitor(func: Callable) -> Callable:
-    """
-    Decorator to track execution latency for core operations.
-    Uses local caching to reduce overhead during tight loops.
-    """
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        import time
-        start_time = time.perf_counter()
-        result = func(*args, **kwargs)
-        duration = time.perf_counter() - start_time
+        # 5MB per file, keep 3 backup files
+        handler = RotatingFileHandler(
+            log_file, 
+            maxBytes=5 * 1024 * 1024, 
+            backupCount=3
+        )
         
-        # Log only if operation exceeds reasonable threshold
-        if duration > 0.1:
-            logger.debug(f"Operation {func.__name__} took {duration:.4f}s")
-        return result
-    return wrapper
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
-def fast_log(message: str) -> None:
-    """
-    Optimized logging call bypassing heavy stack frame introspection.
-    """
-    if logger.isEnabledFor(logging.INFO):
-        logger.info(message)
+        # Add console output as well
+        console = logging.StreamHandler()
+        console.setFormatter(formatter)
+        logger.addHandler(console)
 
-# Initialize stream handler for standard output
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    return logger
