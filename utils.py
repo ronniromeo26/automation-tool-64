@@ -1,43 +1,28 @@
-import os
-import json
 import time
-from typing import Callable, Any, Dict, Optional
+import functools
+import logging
 
+logger = logging.getLogger(__name__)
 
-def retry_on_failure(retries: int = 3, delay: float = 1.0) -> Callable:
-    """Decorator to retry a function if an exception occurs."""
-    def decorator(func: Callable) -> Callable:
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception = None
-            for attempt in range(retries):
+def retry_operation(retries=3, delay=1.0, backoff=2.0, exceptions=(Exception,)):
+    """Decorator to retry network operations with exponential backoff."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            attempt = 0
+            while attempt < retries:
                 try:
                     return func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
-                    if attempt < retries - 1:
-                        time.sleep(delay)
-            raise last_exception if last_exception else RuntimeError("Failed after retries")
+                except exceptions as e:
+                    attempt += 1
+                    if attempt == retries:
+                        logger.error(f"Final attempt {attempt} failed: {e}")
+                        raise
+                    
+                    logger.warning(f"Attempt {attempt} failed, retrying in {current_delay}s...")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+            return None
         return wrapper
     return decorator
-
-
-def ensure_directory(path: str) -> bool:
-    """Ensures that a directory exists, creating it if necessary."""
-    try:
-        os.makedirs(path, exist_ok=True)
-        return True
-    except OSError:
-        return False
-
-
-def safe_read_json(filepath: str, default: Optional[Dict] = None) -> Dict:
-    """Safely reads a JSON file, returning a default value on failure."""
-    if default is None:
-        default = {}
-    if not os.path.exists(filepath):
-        return default
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return default
