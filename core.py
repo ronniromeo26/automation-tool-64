@@ -1,31 +1,27 @@
-import time
-import functools
-import logging
+import sys
 
-logger = logging.getLogger(__name__)
+def validate_input(data):
+    """Ensure data is a non-empty dictionary."""
+    if not isinstance(data, dict) or not data:
+        raise ValueError("Invalid input: payload must be a non-empty dictionary")
+    return True
 
-def with_retry(retries=3, delay=2, exceptions=(ConnectionError, TimeoutError)):
-    """Decorator to retry network operations on specific exceptions."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            last_exception = None
-            for attempt in range(1, retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    last_exception = e
-                    logger.warning(f"Attempt {attempt} failed: {e}. Retrying in {delay}s...")
-                    if attempt < retries:
-                        time.sleep(delay)
-            logger.error(f"Operation failed after {retries} attempts.")
-            raise last_exception
-        return wrapper
-    return decorator
+def process_payload(data):
+    """Process valid data payload."""
+    print(f"Processing: {data}")
+    return True
 
-@with_retry(retries=3, delay=1)
-def fetch_data(url):
-    """Example network operation protected by retry logic."""
-    # Simulated network call
-    logger.info(f"Fetching from {url}...")
-    raise ConnectionError("Server unreachable")
+def run_loop(input_stream):
+    """Main processing loop with input validation."""
+    for item in input_stream:
+        try:
+            if validate_input(item):
+                process_payload(item)
+        except (ValueError, TypeError) as e:
+            print(f"Skipping invalid item: {e}", file=sys.stderr)
+            continue
+
+if __name__ == "__main__":
+    # Example stream of incoming data
+    stream = [{"id": 1}, {}, "invalid", {"id": 2}]
+    run_loop(stream)
