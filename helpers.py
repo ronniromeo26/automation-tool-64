@@ -1,37 +1,43 @@
-import os
-import shutil
-from pathlib import Path
-from typing import List, Union
+"""General data handling utilities for automation-tool-64."""
 
-def clear_temp_directory(directory_path: Union[str, Path]) -> None:
-    """Removes all files and subdirectories within the specified path."""
-    path = Path(directory_path)
-    if not path.exists():
-        return
+from typing import Any, Dict, List, Union
 
-    for item in path.iterdir():
-        try:
-            if item.is_dir():
-                shutil.rmtree(item)
-            else:
-                item.unlink()
-        except OSError as e:
-            print(f"Error removing {item}: {e}")
 
-def archive_old_logs(source_dir: str, target_dir: str, extension: str = '.log') -> List[Path]:
-    """Moves files with a specific extension to an archive directory."""
-    src = Path(source_dir)
-    dst = Path(target_dir)
-    dst.mkdir(parents=True, exist_ok=True)
+def flatten_dict(
+    data: Dict[str, Any], parent_key: str = "", sep: str = "."
+) -> Dict[str, Any]:
+    """Recursively flatten a nested dictionary into single-level key-value pairs."""
+    items: List[tuple] = []
+    for key, value in data.items():
+        new_key = f"{parent_key}{sep}{key}" if parent_key else key
+        if isinstance(value, dict):
+            items.extend(flatten_dict(value, new_key, sep=sep).items())
+        else:
+            items.append((new_key, value))
+    return dict(items)
 
-    archived = []
-    for log_file in src.glob(f"*{extension}"):
-        dest_path = dst / log_file.name
-        shutil.move(str(log_file), str(dest_path))
-        archived.append(dest_path)
-    
-    return archived
 
-def ensure_directory_exists(path: str) -> None:
-    """Creates a directory if it does not exist already."""
-    Path(path).mkdir(parents=True, exist_ok=True)
+def merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merge two dictionaries, giving priority to dict2 values."""
+    result = dict1.copy()
+    for key, value in dict2.items():
+        if (
+            key in result
+            and isinstance(result[key], dict)
+            and isinstance(value, dict)
+        ):
+            result[key] = merge_dicts(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def chunk_iterable(
+    data: Union[List[Any], tuple], chunk_size: int
+) -> List[List[Any]]:
+    """Split a list or tuple into smaller sub-lists of a specified size."""
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than zero")
+    return [
+        list(data[i : i + chunk_size]) for i in range(0, len(data), chunk_size)
+    ]
