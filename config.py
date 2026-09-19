@@ -3,31 +3,33 @@ import os
 from typing import Any, Dict
 
 DEFAULT_CONFIG = {
-    "log_level": "INFO",
-    "max_retries": 3,
     "timeout": 30,
+    "retries": 3,
+    "log_level": "INFO",
     "enabled": True
 }
 
-def load_config(config_path: str = "config.json") -> Dict[str, Any]:
-    """
-    Loads configuration from JSON file, merging with system defaults.
-    """
-    config = DEFAULT_CONFIG.copy()
+class ConfigLoader:
+    """Handles loading and merging of application settings."""
 
-    if not os.path.exists(config_path):
+    def __init__(self, filepath: str = "config.json"):
+        self.filepath = filepath
+
+    def load(self) -> Dict[str, Any]:
+        """Loads configuration from disk or returns defaults."""
+        config = DEFAULT_CONFIG.copy()
+
+        if os.path.exists(self.filepath):
+            try:
+                with open(self.filepath, "r") as f:
+                    user_config = json.load(f)
+                    config.update(user_config)
+            except (json.JSONDecodeError, IOError):
+                pass
+
         return config
 
-    try:
-        with open(config_path, "r") as f:
-            user_config = json.load(f)
-            config.update(user_config)
-    except (json.JSONDecodeError, IOError):
-        pass
-
-    return config
-
-if __name__ == "__main__":
-    # Example usage for automation-tool-64
-    current_config = load_config()
-    print(f"Loaded config: {current_config}")
+def get_config() -> Dict[str, Any]:
+    """Helper to fetch active configuration instance."""
+    loader = ConfigLoader()
+    return loader.load()
