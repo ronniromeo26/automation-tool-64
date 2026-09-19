@@ -9,15 +9,10 @@ def setup_logger(name='automation-tool-64', log_file='app.log', level=logging.IN
 
     # Prevent duplicate handlers if function is called multiple times
     if not logger.handlers:
-        # Ensure log directory exists
-        log_dir = os.path.dirname(log_file)
-        if log_dir and not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-
-        # 5MB per file, keep 3 backup files
+        # 5MB per file, keep 3 historical backups
         handler = RotatingFileHandler(
             log_file, 
-            maxBytes=5 * 1024 * 1024, 
+            maxBytes=5*1024*1024, 
             backupCount=3
         )
         
@@ -26,10 +21,10 @@ def setup_logger(name='automation-tool-64', log_file='app.log', level=logging.IN
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-
-        # Add console output as well
-        console = logging.StreamHandler()
-        console.setFormatter(formatter)
-        logger.addHandler(console)
+        
+        # Optional: Log to console as well
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     return logger
