@@ -1,43 +1,45 @@
-"""General data handling utilities for automation-tool-64."""
+import os
+import json
+import time
+import re
+from typing import Any, Callable, Dict, Optional
 
-from typing import Any, Dict, List, Union
+def sanitize_filename(filename: str, replacement: str = "_") -> str:
+    """Removes or replaces characters that are invalid in filenames."""
+    # Control characters, slashes, backslashes, colons, stars, question marks, quotes, angles, pipes
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', replacement, filename)
+    return cleaned.strip()
 
+def safe_load_json(file_path: str) -> Optional[Dict[str, Any]]:
+    """Safely loads a JSON file, returning None if the file does not exist or is invalid."""
+    if not os.path.exists(file_path):
+        return None
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None
 
-def flatten_dict(
-    data: Dict[str, Any], parent_key: str = "", sep: str = "."
-) -> Dict[str, Any]:
-    """Recursively flatten a nested dictionary into single-level key-value pairs."""
-    items: List[tuple] = []
-    for key, value in data.items():
-        new_key = f"{parent_key}{sep}{key}" if parent_key else key
-        if isinstance(value, dict):
-            items.extend(flatten_dict(value, new_key, sep=sep).items())
-        else:
-            items.append((new_key, value))
-    return dict(items)
+def safe_write_json(file_path: str, data: Any, indent: int = 4) -> bool:
+    """Safely writes data to a JSON file, creating directories if needed."""
+    try:
+        directory = os.path.dirname(file_path)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=indent, ensure_ascii=False)
+        return True
+    except IOError:
+        return False
 
-
-def merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively merge two dictionaries, giving priority to dict2 values."""
-    result = dict1.copy()
-    for key, value in dict2.items():
-        if (
-            key in result
-            and isinstance(result[key], dict)
-            and isinstance(value, dict)
-        ):
-            result[key] = merge_dicts(result[key], value)
-        else:
-            result[key] = value
-    return result
-
-
-def chunk_iterable(
-    data: Union[List[Any], tuple], chunk_size: int
-) -> List[List[Any]]:
-    """Split a list or tuple into smaller sub-lists of a specified size."""
-    if chunk_size <= 0:
-        raise ValueError("chunk_size must be greater than zero")
-    return [
-        list(data[i : i + chunk_size]) for i in range(0, len(data), chunk_size)
-    ]
+def retry_operation(func: Callable[..., Any], retries: int = 3, delay: float = 1.0, *args: Any, **kwargs: Any) -> Any:
+    """Retries a function a specified number of times if it raises an exception."""
+    last_exception = None
+    for attempt in range(retries):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            last_exception = e
+            if attempt < retries - 1:
+                time.sleep(delay)
+    raise last_exception or RuntimeError("Operation failed after retries")
