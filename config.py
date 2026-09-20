@@ -9,27 +9,26 @@ DEFAULT_CONFIG = {
     "enabled": True
 }
 
-class ConfigLoader:
-    """Handles loading and merging of application settings."""
+def load_config(config_path: str = "config.json") -> Dict[str, Any]:
+    """
+    Load configuration from json file with fallback defaults.
+    """
+    config = DEFAULT_CONFIG.copy()
+    
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                user_config = json.load(f)
+                config.update(user_config)
+        except (json.JSONDecodeError, IOError):
+            # Fallback to defaults on file read or parse error
+            pass
+            
+    return config
 
-    def __init__(self, filepath: str = "config.json"):
-        self.filepath = filepath
-
-    def load(self) -> Dict[str, Any]:
-        """Loads configuration from disk or returns defaults."""
-        config = DEFAULT_CONFIG.copy()
-
-        if os.path.exists(self.filepath):
-            try:
-                with open(self.filepath, "r") as f:
-                    user_config = json.load(f)
-                    config.update(user_config)
-            except (json.JSONDecodeError, IOError):
-                pass
-
-        return config
-
-def get_config() -> Dict[str, Any]:
-    """Helper to fetch active configuration instance."""
-    loader = ConfigLoader()
-    return loader.load()
+def get_setting(key: str, default: Any = None) -> Any:
+    """
+    Fetch a specific setting from the application config.
+    """
+    config = load_config()
+    return config.get(key, default)
