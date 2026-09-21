@@ -1,30 +1,34 @@
 import re
-from typing import Any, Optional
 
-def validate_email(email: str) -> bool:
-    """Verify email address format using regex."""
-    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    return bool(re.match(pattern, email))
+def validate_input(data):
+    """Validates dictionary input for required keys and format."""
+    required_fields = ['id', 'payload', 'timestamp']
+    
+    # Check for missing keys
+    if not all(key in data for key in required_fields):
+        return False, "missing required fields"
+    
+    # Validate ID format (must be alphanumeric)
+    if not re.match(r'^[a-zA-Z0-9]+$', str(data['id'])):
+        return False, "invalid id format"
+    
+    # Validate payload type
+    if not isinstance(data['payload'], dict):
+        return False, "payload must be a dictionary"
+    
+    return True, None
 
-def validate_port(port: Any) -> bool:
-    """Check if port is within valid range 1-65535."""
-    try:
-        val = int(port)
-        return 1 <= val <= 65535
-    except (ValueError, TypeError):
-        return False
-
-def validate_required_fields(data: dict, fields: list) -> Optional[str]:
-    """Ensure all required keys exist and are not None."""
-    for field in fields:
-        if field not in data or data[field] is None:
-            return f"missing required field: {field}"
-    return None
-
-def sanitize_string(value: str) -> str:
-    """Remove non-alphanumeric characters from input."""
-    return re.sub(r'[^a-zA-Z0-9_]', '', value)
-
-def is_non_empty_string(value: Any) -> bool:
-    """Check if input is a valid non-empty string."""
-    return isinstance(value, str) and len(value.strip()) > 0
+def process_main_loop(queue):
+    """Main processing loop with input validation integration."""
+    for item in queue:
+        is_valid, error_msg = validate_input(item)
+        
+        if not is_valid:
+            print(f"Skipping invalid entry: {error_msg}")
+            continue
+            
+        try:
+            # Simulate core logic execution
+            print(f"Processing record {item['id']} successfully.")
+        except Exception as e:
+            print(f"Runtime error processing {item.get('id')}: {e}")
