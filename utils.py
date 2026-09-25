@@ -1,34 +1,40 @@
+import os
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-# Configure basic logger for utility functions
+# setup logging for the automation tool
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def safe_load_json(file_path: str) -> Optional[Dict[str, Any]]:
-    """Safely load and parse a JSON configuration file."""
+def load_json(filepath: str) -> Dict[str, Any]:
+    """load and parse a json configuration file"""
+    if not os.path.exists(filepath):
+        logger.error(f"file not found: {filepath}")
+        return {}
     try:
-        with open(file_path, 'r', encoding='utf-8') as file:
-            return json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        logger.error(f"Failed to load data from {file_path}: {e}")
-        return None
+        with open(filepath, 'r') as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        logger.error(f"invalid json format: {e}")
+        return {}
 
-def format_data_size(size_bytes: int) -> str:
-    """Convert raw byte count into a readable string."""
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if size_bytes < 1024.0:
-            return f"{size_bytes:.2f} {unit}"
-        size_bytes /= 1024.0
-    return f"{size_bytes:.2f} PB"
+def save_json(filepath: str, data: Dict[str, Any]) -> bool:
+    """serialize dictionary to a json file"""
+    try:
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=4)
+        return True
+    except Exception as e:
+        logger.error(f"failed to write file: {e}")
+        return False
 
-def flatten_dict(nested_dict: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
-    """Flatten a nested dictionary into a single level."""
-    items = []
-    for k, v in nested_dict.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
+def ensure_dir(path: str) -> None:
+    """verify directory existence or create it"""
+    if not os.path.exists(path):
+        os.makedirs(path)
+        logger.info(f"created directory: {path}")
+
+def get_env_var(key: str, default: Any = None) -> Any:
+    """fetch environment variables with fallback"""
+    return os.environ.get(key, default)
