@@ -1,65 +1,53 @@
 # automation-tool-64
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-`automation-tool-64` is a lightweight Python framework designed to streamline local task execution, file transformations, and scheduled API interactions. It provides a clean event-driven pipeline architecture to orchestrate repetitive operational workflows with minimal overhead.
+`automation-tool-64` is a lightweight, high-performance Python utility designed to streamline repetitive local workflows and system administration tasks. It provides a robust command-line interface to orchestrate file operations, process monitoring, and environment configuration with minimal overhead.
 
 ## Features
 
-- **Asynchronous Execution:** Execute concurrent system tasks and HTTP webhooks using a native `asyncio` task runner.
-- **YAML Pipeline Definitions:** Declare multi-step execution chains, dependencies, and fallback routines in simple configuration files.
-- **Built-in Telemetry:** Track task status, execution metrics, and error traces with automated JSON log generation.
-- **Smart Retries:** Handle transient network failures and IO bottlenecks with configurable exponential backoff strategies.
+*   **Task Scheduling:** Execute complex chains of shell commands and Python scripts based on defined triggers or time intervals.
+*   **Dynamic Logging:** Integrated rotating log system that captures task execution metrics and error states in standardized JSON format.
+*   **Environment Validation:** Automated pre-flight checks to ensure required dependencies, directory permissions, and system variables are active before process execution.
+*   **Plugin Architecture:** Extend functionality by dropping custom scripts into the `plugins/` directory for modular expansion.
 
 ## Installation
 
-Install the package directly from PyPI:
-
-```bash
-pip install automation-tool-64
-```
-
-Or install from source for development:
+Ensure you have Python 3.9+ installed. Clone the repository and install the required dependencies:
 
 ```bash
 git clone https://github.com/Developer/automation-tool-64.git
 cd automation-tool-64
-pip install -e .
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-## Quick Start
+## Basic Usage
 
-Define and execute a basic task pipeline in Python:
-
-```python
-from automation_tool_64 import Pipeline, Task
-
-def process_payload(context):
-    raw_data = context.get("data", "")
-    return {"status": "processed", "payload": raw_data.strip().upper()}
-
-# Initialize pipeline
-pipeline = Pipeline(name="data_cleaner")
-
-# Attach task with automatic retries
-pipeline.add_task(Task(
-    name="sanitize",
-    action=process_payload,
-    max_retries=3
-))
-
-# Run with context
-output = pipeline.run({"data": "  input_value  "})
-print(output)
-# Output: {'status': 'processed', 'payload': 'INPUT_VALUE'}
-```
-
-Run via the command line interface:
+Run the tool using the CLI to execute a defined task configuration file:
 
 ```bash
-auto64 run --config pipeline.yml --verbose
+python main.py --config config/tasks.yaml --run
+```
+
+To list all available modules currently detected by the system:
+
+```bash
+python main.py --list-modules
+```
+
+## Configuration
+
+Tasks are defined in YAML format. A sample configuration:
+
+```yaml
+tasks:
+  - name: cleanup_logs
+    command: "rm -rf ./temp/*.log"
+    interval: "daily"
 ```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Distributed under the MIT License. See `LICENSE` for more information.
