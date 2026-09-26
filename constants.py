@@ -1,35 +1,27 @@
 import os
 from pathlib import Path
 
-# Base application directories
+# Base application paths
 BASE_DIR = Path(__file__).resolve().parent
 LOG_DIR = BASE_DIR / "logs"
-TEMP_DIR = BASE_DIR / "temp"
+DATA_DIR = BASE_DIR / "data"
 
-# Ensure environment directories exist
-LOG_DIR.mkdir(exist_ok=True)
-TEMP_DIR.mkdir(exist_ok=True)
-
-# Configuration defaults
+# Application configuration defaults
 DEFAULT_TIMEOUT = 30
 MAX_RETRIES = 3
-CHUNK_SIZE = 1024 * 1024
+CHUNK_SIZE = 1024 * 1024  # 1MB chunks
 
-# Environment variable keys
-ENV_PREFIX = "AT64_"
-API_KEY_VAR = f"{ENV_PREFIX}API_KEY"
-LOG_LEVEL_VAR = f"{ENV_PREFIX}LOG_LEVEL"
+# Environment specific keys
+ENV_PREFIX = "AUTO64_"
+API_KEY = os.getenv(f"{ENV_PREFIX}API_KEY", "default_secret_key")
+DEBUG_MODE = os.getenv(f"{ENV_PREFIX}DEBUG", "False").lower() == "true"
 
-# Supported file extensions for processing
-ALLOWED_EXTENSIONS = {'.json', '.csv', '.yaml', '.txt'}
+# Supported file extensions
+SUPPORTED_EXTENSIONS = {".json", ".csv", ".yaml", ".toml"}
 
-# Status codes for automation tasks
-STATUS_SUCCESS = 0
-STATUS_WARNING = 1
-STATUS_ERROR = 2
-STATUS_CRITICAL = 3
+# User agent configuration
+USER_AGENT = "automation-tool-64/1.0.0"
 
-# UI/UX string defaults
-APP_NAME = "automation-tool-64"
-VERSION = "1.0.0"
-DEFAULT_ENCODING = "utf-8"
+# Log formatting configuration
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
