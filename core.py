@@ -1,42 +1,46 @@
-import logging
 import os
+import shutil
+import logging
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('automation-tool-64')
 
-def execute_task(file_path: str):
-    """Process file operations with defensive error handling."""
-    if not isinstance(file_path, str):
-        raise TypeError("File path must be a string.")
+class AutomationCore:
+    def __init__(self, workspace_path: str):
+        self.workspace = workspace_path
 
-    try:
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Target {file_path} does not exist.")
+    def purge_temp_files(self, extension: str = '.tmp'):
+        """Removes temporary files with specified extension."""
+        if not os.path.exists(self.workspace):
+            logger.error(f'Workspace {self.workspace} not found.')
+            return
+
+        count = 0
+        for root, _, files in os.walk(self.workspace):
+            for file in files:
+                if file.endswith(extension):
+                    file_path = os.path.join(root, file)
+                    try:
+                        os.remove(file_path)
+                        count += 1
+                    except OSError as e:
+                        logger.warning(f'Failed to delete {file}: {e}')
         
-        with open(file_path, 'r') as file:
-            data = file.read()
+        logger.info(f'Cleanup complete. Removed {count} files.')
+
+    def reorganize_logs(self, archive_dir: str):
+        """Moves log files into an archive directory."""
+        if not os.path.exists(archive_dir):
+            os.makedirs(archive_dir)
             
-        if not data:
-            logger.warning(f"File {file_path} is empty.")
-            return None
-            
-        return data.strip()
+        for item in os.listdir(self.workspace):
+            if item.endswith('.log'):
+                src = os.path.join(self.workspace, item)
+                dst = os.path.join(archive_dir, item)
+                shutil.move(src, dst)
+                logger.info(f'Archived {item}')
 
-    except PermissionError:
-        logger.error(f"Insufficient permissions for {file_path}.")
-        return None
-    except OSError as e:
-        logger.error(f"System error during file access: {e}")
-        return None
-    except Exception as e:
-        logger.critical(f"Unexpected error processing {file_path}: {e}")
-        raise
-
-def main():
-    # Example usage in automation-tool-64
-    target = "config.json"
-    result = execute_task(target)
-    if result:
-        print("Task completed successfully.")
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    tool = AutomationCore('./data')
+    tool.purge_temp_files()
+    tool.reorganize_logs('./archive')
