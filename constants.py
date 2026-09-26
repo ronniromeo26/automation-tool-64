@@ -1,33 +1,35 @@
-from typing import Dict, Final
+import os
+from pathlib import Path
 
-# Configuration constants for automation-tool-64
+# Base application directories
+BASE_DIR = Path(__file__).resolve().parent
+LOG_DIR = BASE_DIR / "logs"
+TEMP_DIR = BASE_DIR / "temp"
 
-TIMEOUT_SECONDS: Final[int] = 30
-MAX_RETRIES: Final[int] = 3
-DEFAULT_ENCODING: Final[str] = "utf-8"
+# Ensure environment directories exist
+LOG_DIR.mkdir(exist_ok=True)
+TEMP_DIR.mkdir(exist_ok=True)
 
-# System path patterns
-LOG_DIR: Final[str] = "./logs"
-DATA_DIR: Final[str] = "./data"
+# Configuration defaults
+DEFAULT_TIMEOUT = 30
+MAX_RETRIES = 3
+CHUNK_SIZE = 1024 * 1024
 
-# Mapping for environment-specific execution modes
-ENV_MAP: Final[Dict[str, str]] = {
-    "dev": "development",
-    "stg": "staging",
-    "prod": "production",
-}
+# Environment variable keys
+ENV_PREFIX = "AT64_"
+API_KEY_VAR = f"{ENV_PREFIX}API_KEY"
+LOG_LEVEL_VAR = f"{ENV_PREFIX}LOG_LEVEL"
 
-def get_timeout_buffer(base_timeout: int) -> float:
-    """Calculates a jittered timeout buffer for network requests.
+# Supported file extensions for processing
+ALLOWED_EXTENSIONS = {'.json', '.csv', '.yaml', '.txt'}
 
-    Args:
-        base_timeout (int): The baseline duration in seconds.
+# Status codes for automation tasks
+STATUS_SUCCESS = 0
+STATUS_WARNING = 1
+STATUS_ERROR = 2
+STATUS_CRITICAL = 3
 
-    Returns:
-        float: The adjusted timeout duration.
-    """
-    return float(base_timeout * 1.1)
-
-# Versioning metadata for the application
-VERSION: Final[str] = "1.0.0"
-APP_NAME: Final[str] = "automation-tool-64"
+# UI/UX string defaults
+APP_NAME = "automation-tool-64"
+VERSION = "1.0.0"
+DEFAULT_ENCODING = "utf-8"
