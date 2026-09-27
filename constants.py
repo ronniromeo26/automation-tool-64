@@ -1,27 +1,25 @@
 import os
-from pathlib import Path
+from typing import Final
 
-# Base application paths
-BASE_DIR = Path(__file__).resolve().parent
-LOG_DIR = BASE_DIR / "logs"
-DATA_DIR = BASE_DIR / "data"
+# Configuration constants for performance optimization
+# Caching thresholds and concurrency limits for core tasks
 
-# Application configuration defaults
-DEFAULT_TIMEOUT = 30
-MAX_RETRIES = 3
-CHUNK_SIZE = 1024 * 1024  # 1MB chunks
+BUFFER_SIZE: Final[int] = 65536
+MAX_WORKER_THREADS: Final[int] = os.cpu_count() or 4
+DEFAULT_TIMEOUT: Final[float] = 30.0
+CACHE_TTL: Final[int] = 3600
 
-# Environment specific keys
-ENV_PREFIX = "AUTO64_"
-API_KEY = os.getenv(f"{ENV_PREFIX}API_KEY", "default_secret_key")
-DEBUG_MODE = os.getenv(f"{ENV_PREFIX}DEBUG", "False").lower() == "true"
+# Path constants for resource management
+BASE_DIR: Final[str] = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR: Final[str] = os.path.join(BASE_DIR, 'data')
+LOG_DIR: Final[str] = os.path.join(BASE_DIR, 'logs')
 
-# Supported file extensions
-SUPPORTED_EXTENSIONS = {".json", ".csv", ".yaml", ".toml"}
+# Performance optimization parameters
+BATCH_SIZE: Final[int] = 100
+RETRY_ATTEMPTS: Final[int] = 3
+USE_ASYNC_IO: Final[bool] = True
 
-# User agent configuration
-USER_AGENT = "automation-tool-64/1.0.0"
-
-# Log formatting configuration
-LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+# Ensure environment directories exist for efficiency
+for directory in [DATA_DIR, LOG_DIR]:
+    if not os.path.exists(directory):
+        os.makedirs(directory, exist_ok=True)
