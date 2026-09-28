@@ -1,45 +1,35 @@
-import os
-import json
 import time
-import re
-from typing import Any, Callable, Dict, Optional
+import functools
+import logging
+from typing import Callable, Any
 
-def sanitize_filename(filename: str, replacement: str = "_") -> str:
-    """Removes or replaces characters that are invalid in filenames."""
-    # Control characters, slashes, backslashes, colons, stars, question marks, quotes, angles, pipes
-    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', replacement, filename)
-    return cleaned.strip()
+logger = logging.getLogger(__name__)
 
-def safe_load_json(file_path: str) -> Optional[Dict[str, Any]]:
-    """Safely loads a JSON file, returning None if the file does not exist or is invalid."""
-    if not os.path.exists(file_path):
-        return None
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return None
+def retry_operation(retries: int = 3, delay: float = 1.0, backoff: int = 2):
+    """Decorator for retrying network operations with exponential backoff."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            current_delay = delay
+            for attempt in range(1, retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if attempt == retries:
+                        logger.error(f"Final attempt {attempt} failed for {func.__name__}")
+                        raise e
+                    
+                    logger.warning(f"Attempt {attempt} failed: {e}. Retrying in {current_delay}s...")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+        return wrapper
+    return decorator
 
-def safe_write_json(file_path: str, data: Any, indent: int = 4) -> bool:
-    """Safely writes data to a JSON file, creating directories if needed."""
-    try:
-        directory = os.path.dirname(file_path)
-        if directory and not os.path.exists(directory):
-            os.makedirs(directory, exist_ok=True)
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=indent, ensure_ascii=False)
-        return True
-    except IOError:
-        return False
-
-def retry_operation(func: Callable[..., Any], retries: int = 3, delay: float = 1.0, *args: Any, **kwargs: Any) -> Any:
-    """Retries a function a specified number of times if it raises an exception."""
-    last_exception = None
-    for attempt in range(retries):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            last_exception = e
-            if attempt < retries - 1:
-                time.sleep(delay)
-    raise last_exception or RuntimeError("Operation failed after retries")
+@retry_operation(retries=3, delay=2.0)
+def fetch_url_data(url: str):
+    """Example network operation function."""
+    # Simulating actual network call
+    import random
+    if random.random() < 0.7:
+        raise ConnectionError("Transient network fault")
+    return {"status": "success", "url": url}
