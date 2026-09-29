@@ -3,34 +3,27 @@ import os
 from typing import Any, Dict
 
 DEFAULT_CONFIG = {
-    "retry_attempts": 3,
     "timeout": 30,
-    "debug_mode": False,
-    "log_level": "INFO"
+    "retries": 3,
+    "log_level": "INFO",
+    "enabled": True
 }
 
-def load_config(config_path: str = "config.json") -> Dict[str, Any]:
-    """
-    Loads configuration from a JSON file with hardcoded defaults.
-    """
+def load_config(filepath: str = "config.json") -> Dict[str, Any]:
+    """Loads configuration from json file with fallback to defaults."""
     config = DEFAULT_CONFIG.copy()
-
-    if os.path.exists(config_path):
+    
+    if os.path.exists(filepath):
         try:
-            with open(config_path, "r") as f:
+            with open(filepath, "r") as f:
                 user_config = json.load(f)
                 config.update(user_config)
         except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: Could not read config file, using defaults: {e}")
-
+            print(f"Warning: failed to load config file: {e}. Using defaults.")
+    
     return config
 
-def save_config(config: Dict[str, Any], config_path: str = "config.json") -> None:
-    """
-    Persists the current configuration dictionary to a JSON file.
-    """
-    try:
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
-    except IOError as e:
-        print(f"Error: Failed to save configuration: {e}")
+if __name__ == "__main__":
+    # Example usage for automation-tool-64
+    current_config = load_config()
+    print(f"Active configuration: {current_config}")
