@@ -1,46 +1,43 @@
-import functools
 import time
+import random
+import urllib.request
+import urllib.error
+import socket
 import logging
 
-# Configure logger for automation-tool-64
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("automation_tool.handler")
 
-# Cache for repetitive resource-heavy operations
-_memoization_cache = {}
+class NetworkHandler:
+    """Handles network requests with built-in retry logic and exponential backoff."""
 
-def memoize_with_ttl(ttl_seconds=300):
-    """Decorator to cache function results with a Time-To-Live constraint."""
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            key = (func.__name__, args, frozenset(kwargs.items()))
-            now = time.time()
-            
-            if key in _memoization_cache:
-                result, timestamp = _memoization_cache[key]
-                if now - timestamp < ttl_seconds:
-                    return result
-            
-            result = func(*args, **kwargs)
-            _memoization_cache[key] = (result, now)
-            return result
-        return wrapper
-    return decorator
+    def __init__(self, max_retries: int = 3, backoff_factor: float = 1.5, timeout: float = 10.0):
+        self.max_retries = max_retries
+        self.backoff_factor = backoff_factor
+        self.timeout = timeout
 
-class DataHandler:
-    """Core processor for handling automation tasks efficiently."""
-    
-    @memoize_with_ttl(ttl_seconds=60)
-    def process_heavy_payload(self, payload: str) -> str:
-        """Simulates a resource-intensive transformation process."""
-        # Simulating overhead
-        time.sleep(0.5)
-        return f"processed_{payload.upper()}"
+    def execute_request(self, url: str) -> str:
+        """Executes a GET request with exponential backoff and jitter."""
+        retries = 0
+        delay = 1.0
 
-    def batch_process(self, data_list: list) -> list:
-        """Optimized batch processor using list comprehensions."""
-        if not data_list:
-            return []
-        
-        logger.info(f"Processing {len(data_list)} items.")
-        return [self.process_heavy_payload(item) for item in data_list]
+        while True:
+            try:
+                logger.info(f"Fetching URL: {url} (Attempt {retries + 1}/{self.max_retries + 1})")
+                req = urllib.request.Request(
+                    url,
+                    headers={"User-Agent": "AutomationTool64/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                    return response.read().decode('utf-8')
+            except (urllib.error.URLError, socket.timeout) as e:
+                retries += 1
+                if retries > self.max_retries:
+                    logger.error(f"Failed to fetch {url} after {self.max_retries} retries. Error: {e}")
+                    raise
+
+                # Calculate exponential backoff with jitter
+                jitter = random.uniform(0.1, 0.5)
+                sleep_time = (delay * self.backoff_factor) + jitter
+                logger.warning(f"Request failed due to {e}. Retrying in {sleep_time:.2f} seconds...")
+                time.sleep(sleep_time)
+                delay = sleep_time
