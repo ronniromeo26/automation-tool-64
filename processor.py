@@ -1,33 +1,37 @@
-import logging
+import json
+from typing import Any, Dict, Optional
 
-def validate_input(data):
-    """Ensures input data conforms to expected structure."""
-    if not isinstance(data, dict):
-        return False
-    required_fields = ['id', 'payload']
-    return all(field in data for field in required_fields)
+def clean_data(data: Any) -> Any:
+    """Recursively remove None values from dictionaries."""
+    if isinstance(data, dict):
+        return {k: clean_data(v) for k, v in data.items() if v is not None}
+    elif isinstance(data, list):
+        return [clean_data(item) for item in data]
+    return data
 
-def run_processing_loop(data_stream):
-    """
-    Main loop for 'automation-tool-64' processing.
-    Validates input before execution to prevent runtime crashes.
-    """
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger(__name__)
+def safe_json_load(file_path: str) -> Optional[Dict[str, Any]]:
+    """Load and parse JSON file with basic error handling."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
 
-    for item in data_stream:
-        if not validate_input(item):
-            logger.warning(f"Skipping invalid entry: {item}")
-            continue
+def format_byte_size(size_bytes: int) -> str:
+    """Convert integer bytes into human-readable string format."""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.2f} TB"
 
-        try:
-            # Simulate core business logic processing
-            process_item(item)
-            logger.info(f"Successfully processed ID: {item['id']}")
-        except Exception as e:
-            logger.error(f"Unexpected error during processing: {e}")
-
-def process_item(item):
-    """Placeholder for core item processing logic."""
-    # Actual logic would go here
-    pass
+def flatten_dict(d: Dict, parent_key: str = '', sep: str = '_') -> Dict:
+    """Flatten nested dictionary into single level structure."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
