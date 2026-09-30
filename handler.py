@@ -1,48 +1,46 @@
+import functools
 import time
 import logging
-import random
-from typing import Callable, Any, Type, Tuple
 
+# Configure logger for automation-tool-64
 logger = logging.getLogger(__name__)
 
-def retry_on_failure(
-    retries: int = 3,
-    backoff_factor: float = 0.5,
-    exceptions: Tuple[Type[BaseException], ...] = (Exception,),
-) -> Callable:
-    """
-    Decorator to retry a function call with exponential backoff on specified exceptions.
-    """
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            delay = backoff_factor
-            for attempt in range(1, retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except exceptions as e:
-                    if attempt == retries:
-                        logger.error(
-                            f"Failed '{func.__name__}' after {retries} attempts. Error: {e}"
-                        )
-                        raise e
-                    
-                    # Apply jitter to avoid thundering herd problem
-                    jitter = random.uniform(0.1, 0.5)
-                    sleep_time = delay + jitter
-                    logger.warning(
-                        f"Attempt {attempt} failed for '{func.__name__}': {e}. "
-                        f"Retrying in {sleep_time:.2f}s..."
-                    )
-                    time.sleep(sleep_time)
-                    delay *= 2
-            return wrapper
-        return decorator
+# Cache for repetitive resource-heavy operations
+_memoization_cache = {}
 
-@retry_on_failure(retries=4, backoff_factor=1.0)
-def execute_network_request(url: str) -> str:
-    """
-    Executes a network request with a timeout and returns decoded content.
-    """
-    import urllib.request
-    with urllib.request.urlopen(url, timeout=5) as response:
-        return response.read().decode('utf-8')
+def memoize_with_ttl(ttl_seconds=300):
+    """Decorator to cache function results with a Time-To-Live constraint."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (func.__name__, args, frozenset(kwargs.items()))
+            now = time.time()
+            
+            if key in _memoization_cache:
+                result, timestamp = _memoization_cache[key]
+                if now - timestamp < ttl_seconds:
+                    return result
+            
+            result = func(*args, **kwargs)
+            _memoization_cache[key] = (result, now)
+            return result
+        return wrapper
+    return decorator
+
+class DataHandler:
+    """Core processor for handling automation tasks efficiently."""
+    
+    @memoize_with_ttl(ttl_seconds=60)
+    def process_heavy_payload(self, payload: str) -> str:
+        """Simulates a resource-intensive transformation process."""
+        # Simulating overhead
+        time.sleep(0.5)
+        return f"processed_{payload.upper()}"
+
+    def batch_process(self, data_list: list) -> list:
+        """Optimized batch processor using list comprehensions."""
+        if not data_list:
+            return []
+        
+        logger.info(f"Processing {len(data_list)} items.")
+        return [self.process_heavy_payload(item) for item in data_list]
