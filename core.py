@@ -1,46 +1,32 @@
-import os
-import shutil
-import logging
+import sys
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('automation-tool-64')
+def validate_input(data):
+    """Ensures input is a non-empty dictionary with required keys."""
+    if not isinstance(data, dict):
+        return False, "Input must be a dictionary"
+    if 'task_id' not in data or 'payload' not in data:
+        return False, "Missing mandatory task_id or payload keys"
+    return True, None
 
-class AutomationCore:
-    def __init__(self, workspace_path: str):
-        self.workspace = workspace_path
-
-    def purge_temp_files(self, extension: str = '.tmp'):
-        """Removes temporary files with specified extension."""
-        if not os.path.exists(self.workspace):
-            logger.error(f'Workspace {self.workspace} not found.')
-            return
-
-        count = 0
-        for root, _, files in os.walk(self.workspace):
-            for file in files:
-                if file.endswith(extension):
-                    file_path = os.path.join(root, file)
-                    try:
-                        os.remove(file_path)
-                        count += 1
-                    except OSError as e:
-                        logger.warning(f'Failed to delete {file}: {e}')
+def process_items(data_stream):
+    """Main processing loop with integrated input validation."""
+    for item in data_stream:
+        is_valid, error = validate_input(item)
         
-        logger.info(f'Cleanup complete. Removed {count} files.')
-
-    def reorganize_logs(self, archive_dir: str):
-        """Moves log files into an archive directory."""
-        if not os.path.exists(archive_dir):
-            os.makedirs(archive_dir)
+        if not is_valid:
+            print(f"Validation error: {error}. Skipping item.")
+            continue
             
-        for item in os.listdir(self.workspace):
-            if item.endswith('.log'):
-                src = os.path.join(self.workspace, item)
-                dst = os.path.join(archive_dir, item)
-                shutil.move(src, dst)
-                logger.info(f'Archived {item}')
+        try:
+            print(f"Processing task {item['task_id']}: {item['payload']}")
+        except Exception as e:
+            print(f"Unexpected processing failure: {e}")
 
-if __name__ == '__main__':
-    tool = AutomationCore('./data')
-    tool.purge_temp_files()
-    tool.reorganize_logs('./archive')
+if __name__ == "__main__":
+    # Example input stream for automation-tool-64
+    sample_data = [
+        {'task_id': 1, 'payload': 'data_alpha'},
+        {'invalid': 'data_beta'},
+        {'task_id': 2, 'payload': 'data_gamma'}
+    ]
+    process_items(sample_data)
