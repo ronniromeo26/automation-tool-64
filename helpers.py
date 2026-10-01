@@ -1,35 +1,42 @@
+import os
+import json
 import time
-import functools
-import logging
-from typing import Callable, Any
+from functools import wraps
+from typing import Any, Callable, Dict, Optional
 
-logger = logging.getLogger(__name__)
+def safe_read_json(file_path: str, default: Optional[Dict] = None) -> Dict:
+    """Safely read a JSON file and return its content, or a default value on failure."""
+    if default is None:
+        default = {}
+    if not os.path.exists(file_path):
+        return default
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return default
 
-def retry_operation(retries: int = 3, delay: float = 1.0, backoff: int = 2):
-    """Decorator for retrying network operations with exponential backoff."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
+def ensure_directory(path: str) -> bool:
+    """Create a directory path if it does not exist. Returns True if created/exists."""
+    try:
+        os.makedirs(path, exist_ok=True)
+        return True
+    except OSError:
+        return False
+
+def retry(retries: int = 3, delay: float = 1.0) -> Callable:
+    """Decorator to retry a function call if it raises an exception."""
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            current_delay = delay
-            for attempt in range(1, retries + 1):
+            last_exception = None
+            for attempt in range(retries):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    if attempt == retries:
-                        logger.error(f"Final attempt {attempt} failed for {func.__name__}")
-                        raise e
-                    
-                    logger.warning(f"Attempt {attempt} failed: {e}. Retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
+                    last_exception = e
+                    if attempt < retries - 1:
+                        time.sleep(delay)
+            raise last_exception or RuntimeError('Retry failed')
         return wrapper
     return decorator
-
-@retry_operation(retries=3, delay=2.0)
-def fetch_url_data(url: str):
-    """Example network operation function."""
-    # Simulating actual network call
-    import random
-    if random.random() < 0.7:
-        raise ConnectionError("Transient network fault")
-    return {"status": "success", "url": url}
