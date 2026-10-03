@@ -1,32 +1,32 @@
-import sys
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
+from typing import Any, Dict, List
 
-def validate_input(data):
-    """Ensures input is a non-empty dictionary with required keys."""
-    if not isinstance(data, dict):
-        return False, "Input must be a dictionary"
-    if 'task_id' not in data or 'payload' not in data:
-        return False, "Missing mandatory task_id or payload keys"
-    return True, None
 
-def process_items(data_stream):
-    """Main processing loop with integrated input validation."""
-    for item in data_stream:
-        is_valid, error = validate_input(item)
-        
-        if not is_valid:
-            print(f"Validation error: {error}. Skipping item.")
-            continue
-            
-        try:
-            print(f"Processing task {item['task_id']}: {item['payload']}")
-        except Exception as e:
-            print(f"Unexpected processing failure: {e}")
+class TaskPipeline:
+    """Core execution pipeline with concurrent batch execution and caching."""
 
-if __name__ == "__main__":
-    # Example input stream for automation-tool-64
-    sample_data = [
-        {'task_id': 1, 'payload': 'data_alpha'},
-        {'invalid': 'data_beta'},
-        {'task_id': 2, 'payload': 'data_gamma'}
-    ]
-    process_items(sample_data)
+    def __init__(self, max_workers: int = 4):
+        self.max_workers = max_workers
+        self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
+
+    @lru_cache(maxsize=256)
+    def _cached_transform(self, data_hash: int, raw_data: str) -> str:
+        # Cache result of expensive data transformation steps
+        return raw_data.strip().upper()
+
+    def _process_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        data = item.get("data", "")
+        data_hash = hash(data)
+        processed = self._cached_transform(data_hash, data)
+        return {"id": item.get("id"), "result": processed, "status": "success"}
+
+    def execute_batch(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Execute a batch of tasks concurrently using worker pool."""
+        if not items:
+            return []
+        return list(self._executor.map(self._process_item, items))
+
+    def shutdown(self) -> None:
+        """Gracefully shutdown the thread pool executor."""
+        self._executor.shutdown(wait=True)
