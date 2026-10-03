@@ -5,32 +5,30 @@ from typing import Any, Dict
 DEFAULT_CONFIG = {
     "retries": 3,
     "timeout": 30,
-    "log_level": "INFO",
-    "enabled": True
+    "verbose": False,
+    "output_dir": "./data"
 }
 
-def load_config(config_path: str = "config.json") -> Dict[str, Any]:
-    """loads configuration from json file with defaults"""
+def load_configuration(path: str = "config.json") -> Dict[str, Any]:
+    """Loads configuration from disk with fallback defaults."""
     config = DEFAULT_CONFIG.copy()
     
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r") as f:
-                user_config = json.load(f)
-                config.update(user_config)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"failed to load config, using defaults: {e}")
-            
+    if not os.path.exists(path):
+        return config
+        
+    try:
+        with open(path, "r") as file:
+            user_config = json.load(file)
+            config.update(user_config)
+    except (json.JSONDecodeError, IOError):
+        pass
+        
     return config
 
-def save_config(config: Dict[str, Any], config_path: str = "config.json") -> None:
-    """persists configuration dictionary to json file"""
+def save_configuration(config: Dict[str, Any], path: str = "config.json") -> None:
+    """Persists current configuration dictionary to file."""
     try:
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
+        with open(path, "w") as file:
+            json.dump(config, file, indent=4)
     except IOError as e:
-        print(f"failed to save config: {e}")
-
-if __name__ == "__main__":
-    current_config = load_config()
-    print(f"active configuration: {current_config}")
+        print(f"Failed to save configuration: {e}")
