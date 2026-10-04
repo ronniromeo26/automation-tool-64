@@ -1,37 +1,32 @@
-import json
-from typing import Any, Dict, Optional
+import logging
 
-def clean_data(data: Any) -> Any:
-    """Recursively remove None values from dictionaries."""
-    if isinstance(data, dict):
-        return {k: clean_data(v) for k, v in data.items() if v is not None}
-    elif isinstance(data, list):
-        return [clean_data(item) for item in data]
-    return data
+def process_items(data_list):
+    """Processes a list of items with strict validation."""
+    logger = logging.getLogger(__name__)
+    results = []
 
-def safe_json_load(file_path: str) -> Optional[Dict[str, Any]]:
-    """Load and parse JSON file with basic error handling."""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+    for index, item in enumerate(data_list):
+        # Ensure item is a dictionary
+        if not isinstance(item, dict):
+            logger.warning(f"Skipping invalid item at index {index}: Expected dict, got {type(item).__name__}")
+            continue
 
-def format_byte_size(size_bytes: int) -> str:
-    """Convert integer bytes into human-readable string format."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024:
-            return f"{size_bytes:.2f} {unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.2f} TB"
+        # Mandatory field validation
+        required_fields = ['id', 'payload']
+        if not all(k in item for k in required_fields):
+            logger.error(f"Validation failure at index {index}: Missing mandatory keys")
+            continue
 
-def flatten_dict(d: Dict, parent_key: str = '', sep: str = '_') -> Dict:
-    """Flatten nested dictionary into single level structure."""
-    items = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
+        # Type constraint validation
+        if not isinstance(item.get('id'), int):
+            logger.error(f"Type mismatch at index {index}: 'id' must be integer")
+            continue
+
+        # Execute processing
+        try:
+            processed_data = f"ID:{item['id']}_DATA:{str(item['payload'])[:10]}"
+            results.append(processed_data)
+        except Exception as e:
+            logger.exception(f"Unexpected processing error at index {index}: {e}")
+
+    return results
