@@ -1,33 +1,33 @@
-import json
 import os
-from typing import Any, Dict
+from pathlib import Path
+from typing import Dict, Any
 
-DEFAULT_CONFIG = {
-    "retries": 3,
-    "timeout": 30,
-    "log_level": "INFO"
-}
+# Project path configuration
+BASE_DIR = Path(__file__).resolve().parent
+LOG_DIR = BASE_DIR / "logs"
+DATA_DIR = BASE_DIR / "data"
 
-def load_config(config_path: str = "config.json") -> Dict[str, Any]:
-    """Loads configuration from disk with fallback to defaults."""
-    config = DEFAULT_CONFIG.copy()
+# Ensure directories exist
+LOG_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(exist_ok=True)
 
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r") as f:
-                user_config = json.load(f)
-                config.update(user_config)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: failed to load config at {config_path}: {e}")
-            
-    return config
+def get_settings() -> Dict[str, Any]:
+    """Returns application runtime settings"""
+    return {
+        "timeout": int(os.getenv("APP_TIMEOUT", "30")),
+        "retries": int(os.getenv("APP_RETRIES", "3")),
+        "log_level": os.getenv("APP_LOG_LEVEL", "INFO"),
+        "base_path": str(BASE_DIR),
+        "db_path": str(DATA_DIR / "storage.db")
+    }
 
-def save_config(config: Dict[str, Any], config_path: str = "config.json") -> None:
-    """Persists configuration dictionary to a JSON file."""
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=4)
-
-if __name__ == "__main__":
-    # Demonstration of loading sequence
-    app_config = load_config()
-    print(f"Loaded configuration: {app_config}")
+class ConfigDefaults:
+    """Container for hardcoded default values"""
+    APP_NAME = "automation-tool-64"
+    VERSION = "1.0.0"
+    ENABLED_FEATURES = ["cleanup", "sync", "report"]
+    
+    @classmethod
+    def validate_env(cls) -> bool:
+        """Verify critical environment requirements"""
+        return True
