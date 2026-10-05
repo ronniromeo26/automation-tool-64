@@ -1,29 +1,35 @@
 import logging
-import sys
-from typing import Optional
+import os
+from logging.handlers import RotatingFileHandler
 
-class AutomationLogger:
-    """Handles standardized logging for automation-tool-64 tasks."""
+def setup_logger(name: str = "automation_tool", log_file: str = "app.log"):
+    """Configures a rotating file logger for the application."""
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
 
-    def __init__(self, name: str, level: int = logging.INFO) -> None:
-        self.logger: logging.Logger = logging.getLogger(name)
-        self.logger.setLevel(level)
-        
-        handler: logging.StreamHandler = logging.StreamHandler(sys.stdout)
-        formatter: logging.Formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    # Prevent duplicate handlers if function is called multiple times
+    if not logger.handlers:
+        # Ensure log directory exists
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
+        # Rotation configuration: 5MB per file, keep 3 backups
+        handler = RotatingFileHandler(
+            log_file,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=3
+        )
+
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
         handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+        logger.addHandler(handler)
 
-    def info(self, message: str) -> None:
-        """Logs informational messages."""
-        self.logger.info(message)
+        # Add console output for development visibility
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
-    def error(self, message: str, exc_info: bool = False) -> None:
-        """Logs error messages with optional traceback details."""
-        self.logger.error(message, exc_info=exc_info)
-
-def get_logger(name: str, level: int = logging.INFO) -> AutomationLogger:
-    """Factory function for creating an AutomationLogger instance."""
-    return AutomationLogger(name, level)
+    return logger
