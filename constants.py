@@ -1,31 +1,33 @@
 import os
 from pathlib import Path
 
-# Configuration paths
+# Base directories for automation storage
 BASE_DIR = Path(__file__).resolve().parent
-LOG_DIR = BASE_DIR / 'logs'
-DATA_DIR = BASE_DIR / 'data'
+DEFAULT_DATA_DIR = BASE_DIR / "data"
+DEFAULT_LOG_DIR = BASE_DIR / "logs"
 
-# Application constraints
+# Network and process limits
+DEFAULT_TIMEOUT_SECONDS = 30
 MAX_RETRIES = 3
-TIMEOUT_SECONDS = 30
+BACKOFF_FACTOR_SECONDS = 1.5
 
-# Supported file extensions for processing
-SUPPORTED_EXTENSIONS = {'.json', '.csv', '.yaml', '.txt'}
+# File operations and encoding
+DEFAULT_ENCODING = "utf-8"
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+DATE_ONLY_FORMAT = "%Y-%m-%d"
 
-# Environment variables keys
-ENV_API_KEY = 'AUTOMATION_API_KEY'
-ENV_LOG_LEVEL = 'AUTOMATION_LOG_LEVEL'
+# Execution status tracking state strings
+STATUS_PENDING = "pending"
+STATUS_RUNNING = "running"
+STATUS_SUCCESS = "success"
+STATUS_FAILED = "failed"
 
-# Default operation settings
-DEFAULT_CHUNK_SIZE = 1024 * 1024  # 1MB
-DEFAULT_ENCODING = 'utf-8'
+# Environment variable lookup keys
+ENV_API_KEY = "AUTOMATION_API_KEY"
+ENV_ENVIRONMENT = "AUTOMATION_ENV"
+ENV_LOG_LEVEL = "AUTOMATION_LOG_LEVEL"
 
-# Ensure required directories exist on startup
-for directory in [LOG_DIR, DATA_DIR]:
-    directory.mkdir(exist_ok=True)
-
-# Status codes for automation tasks
-STATUS_SUCCESS = 0
-STATUS_WARNING = 1
-STATUS_ERROR = 2
+# Process termination and exit codes
+EXIT_CODE_SUCCESS = 0
+EXIT_CODE_ERROR = 1
+EXIT_CODE_CONFIG_INVALID = 2
