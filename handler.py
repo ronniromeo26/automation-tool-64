@@ -1,36 +1,40 @@
-import json
-import logging
-from typing import Any, Dict, Optional
+import time
+import functools
+import requests
+from typing import Callable, Any
 
-# Configure logger for automation-tool-64
-logger = logging.getLogger(__name__)
+def retry_network_operation(max_retries: int = 3, delay: float = 1.0):
+    """Decorator for retrying network operations with exponential backoff."""
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            last_exception = None
+            current_delay = delay
+            
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except (requests.exceptions.RequestException, ConnectionError) as e:
+                    last_exception = e
+                    if attempt < max_retries - 1:
+                        time.sleep(current_delay)
+                        current_delay *= 2
+                    continue
+            
+            raise last_exception
+        return wrapper
+    return decorator
 
-def sanitize_data(data: Any) -> Any:
-    """Recursively convert complex objects to JSON-serializable types."""
-    if isinstance(data, dict):
-        return {str(k): sanitize_data(v) for k, v in data.items()}
-    if isinstance(data, (list, tuple, set)):
-        return [sanitize_data(i) for i in data]
-    if hasattr(data, "__dict__"):
-        return sanitize_data(vars(data))
-    return data
+@retry_network_operation(max_retries=3, delay=2.0)
+def fetch_url(url: str) -> str:
+    """Performs a GET request with automatic retry logic."""
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    return response.text
 
-def safe_json_dump(data: Any, filepath: str) -> bool:
-    """Write data to a JSON file with error handling."""
+if __name__ == "__main__":
     try:
-        cleaned_data = sanitize_data(data)
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(cleaned_data, f, indent=4)
-        return True
-    except (TypeError, IOError) as e:
-        logger.error(f"failed to write data to {filepath}: {e}")
-        return False
-
-def load_json_data(filepath: str) -> Optional[Dict[str, Any]]:
-    """Read and return JSON data from a file."""
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError) as e:
-        logger.error(f"failed to load data from {filepath}: {e}")
-        return None
+        content = fetch_url("https://api.example.com/data")
+        print("Operation successful")
+    except Exception as e:
+        print(f"Operation failed after retries: {e}")
