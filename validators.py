@@ -1,29 +1,23 @@
 import re
-from typing import Any, Dict
+import os
 
-def validate_input_data(data: Dict[str, Any]) -> bool:
-    """Validates dictionary structure for processing loop."""
-    required_keys = {"id", "payload", "timestamp"}
-    if not all(key in data for key in required_keys):
-        return False
+def is_valid_email(email: str) -> bool:
+    """Validate email address format using regex."""
+    pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+    return bool(re.match(pattern, email))
 
-    # Validate ID format (must be alphanumeric)
-    if not isinstance(data["id"], str) or not re.match(r"^[a-zA-Z0-9]+$", data["id"]):
-        return False
+def is_valid_file_path(path: str) -> bool:
+    """Check if path is absolute and points to an existing file."""
+    return os.path.isfile(path) and os.path.isabs(path)
 
-    # Validate payload type
-    if not isinstance(data["payload"], dict):
-        return False
+def sanitize_input(user_input: str) -> str:
+    """Remove non-alphanumeric characters for security."""
+    return re.sub(r'[^a-zA-Z0-9]', '', user_input)
 
-    return True
+def validate_port(port: int) -> bool:
+    """Validate network port range."""
+    return 1 <= port <= 65535
 
-def process_data_stream(stream: list) -> list:
-    """Filters and validates incoming data stream."""
-    valid_records = []
-    for entry in stream:
-        if validate_input_data(entry):
-            valid_records.append(entry)
-        else:
-            # Log invalid record silently
-            continue
-    return valid_records
+def check_required_env_vars(vars_list: list) -> bool:
+    """Verify presence of mandatory environment configuration."""
+    return all(os.getenv(var) is not None for var in vars_list)
