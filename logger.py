@@ -1,35 +1,37 @@
 import logging
-import os
 from logging.handlers import RotatingFileHandler
+import os
 
-def setup_logger(name: str = "automation_tool", log_file: str = "app.log"):
-    """Configures a rotating file logger for the application."""
+def get_logger(name: str, log_file: str = 'automation.log') -> logging.Logger:
+    """
+    Configures and returns a rotating file logger for automation-tool-64.
+    """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
-    # Prevent duplicate handlers if function is called multiple times
+    # Prevent duplicate handlers if get_logger is called multiple times
     if not logger.handlers:
-        # Ensure log directory exists
-        log_dir = os.path.dirname(log_file)
-        if log_dir and not os.path.exists(log_dir):
-            os.makedirs(log_dir)
-
-        # Rotation configuration: 5MB per file, keep 3 backups
+        # 5MB per file, keeping 3 backups
         handler = RotatingFileHandler(
-            log_file,
-            maxBytes=5 * 1024 * 1024,
+            log_file, 
+            maxBytes=5*1024*1024, 
             backupCount=3
         )
-
+        
         formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-        # Add console output for development visibility
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+        # Optional: Add stream handler for console output
+        console = logging.StreamHandler()
+        console.setFormatter(formatter)
+        logger.addHandler(console)
 
     return logger
+
+if __name__ == '__main__':
+    # Demo usage
+    log = get_logger('proc_logger')
+    log.info('logger initialization sequence completed')
