@@ -1,53 +1,48 @@
 # automation-tool-64
 
-`automation-tool-64` is a lightweight, high-performance Python utility designed to streamline repetitive local workflows and system administration tasks. It provides a robust command-line interface to orchestrate file operations, process monitoring, and environment configuration with minimal overhead.
+`automation-tool-64` is a lightweight Python framework designed to streamline repetitive cross-platform administrative tasks. It provides a robust execution engine to orchestrate file system operations, remote command execution, and automated report generation.
 
 ## Features
 
-*   **Task Scheduling:** Execute complex chains of shell commands and Python scripts based on defined triggers or time intervals.
-*   **Dynamic Logging:** Integrated rotating log system that captures task execution metrics and error states in standardized JSON format.
-*   **Environment Validation:** Automated pre-flight checks to ensure required dependencies, directory permissions, and system variables are active before process execution.
-*   **Plugin Architecture:** Extend functionality by dropping custom scripts into the `plugins/` directory for modular expansion.
+*   **Task Scheduling:** Built-in cron-like syntax support for triggering automated scripts at specific intervals.
+*   **Workflow Chaining:** Create complex dependency graphs where the output of one task serves as the input for the next.
+*   **Encrypted Configuration:** Built-in support for secure credential management using environment-based AES-256 encryption.
+*   **Real-time Logging:** Integrated structured logging to JSON or stdout for seamless ingestion into ELK or Splunk stacks.
 
 ## Installation
 
-Ensure you have Python 3.9+ installed. Clone the repository and install the required dependencies:
+Ensure you have Python 3.9+ installed. You can install the tool via pip:
 
 ```bash
 git clone https://github.com/Developer/automation-tool-64.git
 cd automation-tool-64
-python3 -m venv venv
-source venv/bin/activate
 pip install -r requirements.txt
+python setup.py install
 ```
 
-## Basic Usage
+## Usage
 
-Run the tool using the CLI to execute a defined task configuration file:
+Define your automation workflow in a YAML file, then execute the tool using the command-line interface:
 
 ```bash
-python main.py --config config/tasks.yaml --run
+# Example: Running a defined workflow
+auto64 run --config workflows/cleanup.yaml --verbose
 ```
 
-To list all available modules currently detected by the system:
-
-```bash
-python main.py --list-modules
-```
-
-## Configuration
-
-Tasks are defined in YAML format. A sample configuration:
+**Example YAML configuration:**
 
 ```yaml
 tasks:
-  - name: cleanup_logs
-    command: "rm -rf ./temp/*.log"
-    interval: "daily"
+  - name: "Log Cleanup"
+    command: "rm -rf /tmp/app-logs/*"
+    schedule: "0 0 * * *"
+  - name: "Notify Admin"
+    command: "python notify.py --status success"
+    dependencies: ["Log Cleanup"]
 ```
 
 ## License
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Distributed under the MIT License. See `LICENSE` for more information.
+This project is licensed under the terms of the MIT license.
