@@ -1,45 +1,29 @@
-"""
-Custom exception classes for automation-tool-64.
+import time
+import random
+import functools
+import logging
 
-Provides structured error handling and serialization capabilities for common
-automation pipeline failures.
-"""
+logger = logging.getLogger(__name__)
 
-from typing import Any, Dict, Optional
-
-
-class AutomationError(Exception):
-    """Base exception for all automation-related issues."""
-
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(message)
-        self.message = message
-        self.details = details or {}
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize the exception data into a dictionary for logging or API outputs."""
-        return {
-            "error_type": self.__class__.__name__,
-            "message": self.message,
-            "details": self.details
-        }
-
-
-class ConnectionTimeoutError(AutomationError):
-    """Raised when external services or APIs fail to respond within limits."""
-    pass
-
-
-class ValidationError(AutomationError):
-    """Raised when configuration inputs or pipeline payloads fail validation."""
-    pass
-
-
-class TaskExecutionError(AutomationError):
-    """Raised when a specific automation step fails during runtime execution."""
-
-    def __init__(self, message: str, task_name: str, step_id: int, details: Optional[Dict[str, Any]] = None) -> None:
-        context = {"task_name": task_name, "step_id": step_id}
-        if details:
-            context.update(details)
-        super().__init__(message, details=context)
+def retry_network_operation(max_attempts=3, base_delay=1.0, exceptions=(ConnectionError, TimeoutError)):
+    """Decorator to retry network-related functions with exponential backoff."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            attempts = 0
+            while attempts < max_attempts:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    attempts += 1
+                    if attempts == max_attempts:
+                        logger.error(f"Failed after {max_attempts} attempts: {e}")
+                        raise
+                    
+                    # Exponential backoff with jitter
+                    sleep_time = (base_delay * (2 ** (attempts - 1))) + (random.uniform(0, 0.1))
+                    logger.warning(f"Attempt {attempts} failed, retrying in {sleep_time:.2f}s...")
+                    time.sleep(sleep_time)
+            return None
+        return wrapper
+    return decorator
