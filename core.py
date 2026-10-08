@@ -1,38 +1,40 @@
+import os
+import shutil
 import logging
-import sys
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('automation-tool-64')
+# configure logging for operational transparency
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
-class AutomationError(Exception):
-    """Custom base exception for automation-tool-64"""
-    pass
+def cleanup_directory(target_path: str, extension: str = '.tmp') -> int:
+    """Removes files with specific extension from target path."""
+    count = 0
+    if not os.path.exists(target_path):
+        logger.error(f"path {target_path} does not exist")
+        return 0
 
-def execute_task(task_data: dict) -> bool:
-    """Executes a task with robust error handling for edge cases."""
-    try:
-        if not isinstance(task_data, dict):
-            raise ValueError("Input must be a dictionary")
+    for item in os.listdir(target_path):
+        if item.endswith(extension):
+            file_path = os.path.join(target_path, item)
+            try:
+                os.remove(file_path)
+                count += 1
+            except OSError as e:
+                logger.warning(f"failed to remove {item}: {e}")
+    
+    logger.info(f"cleanup complete: {count} files removed")
+    return count
+
+def organize_files(source_dir: str, target_base: str) -> None:
+    """Reorganize files into categorized subdirectories."""
+    for filename in os.listdir(source_dir):
+        ext = filename.split('.')[-1].lower() if '.' in filename else 'misc'
+        dest_dir = os.path.join(target_base, ext)
         
-        task_id = task_data.get('id')
-        if task_id is None:
-            raise KeyError("Missing mandatory task identifier")
-            
-        # Simulate logic
-        logger.info(f"Processing task: {task_id}")
-        return True
+        os.makedirs(dest_dir, exist_ok=True)
+        shutil.move(os.path.join(source_dir, filename), os.path.join(dest_dir, filename))
 
-    except ValueError as e:
-        logger.error(f"Invalid input format: {e}")
-        return False
-    except KeyError as e:
-        logger.error(f"Missing required configuration: {e}")
-        return False
-    except Exception as e:
-        logger.critical(f"Unexpected system failure: {e}", exc_info=True)
-        return False
-
-if __name__ == '__main__':
-    # Example edge case execution
-    success = execute_task({'id': 101})
-    sys.exit(0 if success else 1)
+if __name__ == "__main__":
+    # execution entry point for automation tasks
+    cleanup_directory('./temp')
+    organize_files('./data', './archive')
