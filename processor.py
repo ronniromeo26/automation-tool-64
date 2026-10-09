@@ -1,32 +1,36 @@
-import logging
+from typing import List, Dict, Optional, Any
 
-def process_items(data_list):
-    """Processes a list of items with strict validation."""
-    logger = logging.getLogger(__name__)
-    results = []
+class DataProcessor:
+    """Handles transformation of raw data batches."""
 
-    for index, item in enumerate(data_list):
-        # Ensure item is a dictionary
-        if not isinstance(item, dict):
-            logger.warning(f"Skipping invalid item at index {index}: Expected dict, got {type(item).__name__}")
-            continue
+    def __init__(self, threshold: int = 100) -> None:
+        self.threshold: int = threshold
 
-        # Mandatory field validation
-        required_fields = ['id', 'payload']
-        if not all(k in item for k in required_fields):
-            logger.error(f"Validation failure at index {index}: Missing mandatory keys")
-            continue
+    def clean_data(self, records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Filter and normalize record sets based on internal threshold."""
+        return [r for r in records if r.get("value", 0) >= self.threshold]
 
-        # Type constraint validation
-        if not isinstance(item.get('id'), int):
-            logger.error(f"Type mismatch at index {index}: 'id' must be integer")
-            continue
+    def process_batch(self, data: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        Transform processed records into a summary dictionary.
+        Returns None if input list is empty.
+        """
+        if not data:
+            return None
 
-        # Execute processing
-        try:
-            processed_data = f"ID:{item['id']}_DATA:{str(item['payload'])[:10]}"
-            results.append(processed_data)
-        except Exception as e:
-            logger.exception(f"Unexpected processing error at index {index}: {e}")
+        cleaned: List[Dict[str, Any]] = self.clean_data(data)
+        total_sum: float = sum(item.get("value", 0) for item in cleaned)
+        
+        return {
+            "count": len(cleaned),
+            "average": total_sum / len(cleaned) if cleaned else 0
+        }
 
-    return results
+def execute_pipeline(items: List[Dict[str, Any]]) -> None:
+    """Execution entry point for data processing tasks."""
+    processor = DataProcessor(threshold=50)
+    result = processor.process_batch(items)
+    if result:
+        print(f"Processing complete: {result}")
+    else:
+        print("No valid records found for processing.")
