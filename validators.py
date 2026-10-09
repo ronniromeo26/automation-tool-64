@@ -1,43 +1,33 @@
-import re
-from typing import Optional
+import logging
+from typing import Any, Optional
 
-def validate_email(email: str) -> bool:
-    """Validate email format using regex pattern.
+logger = logging.getLogger(__name__)
 
-    Args:
-        email: The email string to validate.
-
-    Returns:
-        True if format is valid, False otherwise.
-    """
-    pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
-    return bool(re.match(pattern, email))
-
-def validate_numeric_input(value: str, min_val: Optional[int] = None) -> bool:
-    """Check if input string is numeric and optionally above minimum.
-
-    Args:
-        value: String representation of a number.
-        min_val: Optional lower bound integer check.
-
-    Returns:
-        True if valid numeric criteria are met.
-    """
-    if not value.isdigit():
+def validate_input_schema(data: Any, expected_keys: list) -> bool:
+    """Ensures input data is a dictionary and contains required keys."""
+    try:
+        if not isinstance(data, dict):
+            logger.error(f"Invalid data type: expected dict, got {type(data).__name__}")
+            return False
+        
+        missing = [key for key in expected_keys if key not in data]
+        if missing:
+            logger.warning(f"Missing required keys: {', '.join(missing)}")
+            return False
+            
+        return True
+    except Exception as e:
+        logger.critical(f"Unexpected error during schema validation: {str(e)}")
         return False
-    
-    if min_val is not None:
-        return int(value) >= min_val
-    
-    return True
 
-def sanitize_identifier(name: str) -> str:
-    """Remove non-alphanumeric characters from identifier strings.
-
-    Args:
-        name: Raw identifier string.
-
-    Returns:
-        Sanitized version with only alphanumerics.
-    """
-    return re.sub(r'[^a-zA-Z0-9]', '', name)
+def sanitize_path(path: Optional[str]) -> str:
+    """Safely handles path strings to prevent NoneType errors."""
+    if path is None:
+        logger.debug("Received null path input, defaulting to empty string")
+        return ""
+        
+    try:
+        return str(path).strip()
+    except (ValueError, TypeError) as e:
+        logger.error(f"Sanitization failed for path input: {str(e)}")
+        return ""
