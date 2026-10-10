@@ -1,40 +1,38 @@
-import os
-import json
-import logging
-from typing import Any, Dict
+"""Data handling utilities for automation workflows."""
 
-# setup logging for the automation tool
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from typing import Any, Dict, List, Optional
 
-def load_json(filepath: str) -> Dict[str, Any]:
-    """load and parse a json configuration file"""
-    if not os.path.exists(filepath):
-        logger.error(f"file not found: {filepath}")
-        return {}
-    try:
-        with open(filepath, 'r') as f:
-            return json.load(f)
-    except json.JSONDecodeError as e:
-        logger.error(f"invalid json format: {e}")
-        return {}
 
-def save_json(filepath: str, data: Dict[str, Any]) -> bool:
-    """serialize dictionary to a json file"""
-    try:
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=4)
-        return True
-    except Exception as e:
-        logger.error(f"failed to write file: {e}")
-        return False
+def flatten_dict(data: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
+    """Recursively flatten a nested dictionary using key paths."""
+    items: List[tuple] = []
+    for key, value in data.items():
+        new_key = f"{parent_key}{sep}{key}" if parent_key else str(key)
+        if isinstance(value, dict):
+            items.extend(flatten_dict(value, new_key, sep=sep).items())
+        else:
+            items.append((new_key, value))
+    return dict(items)
 
-def ensure_dir(path: str) -> None:
-    """verify directory existence or create it"""
-    if not os.path.exists(path):
-        os.makedirs(path)
-        logger.info(f"created directory: {path}")
 
-def get_env_var(key: str, default: Any = None) -> Any:
-    """fetch environment variables with fallback"""
-    return os.environ.get(key, default)
+def get_nested_value(data: Dict[str, Any], path: str, default: Optional[Any] = None, sep: str = ".") -> Any:
+    """Extract value from nested dictionary using dot-delimited path string."""
+    keys = path.split(sep)
+    current = data
+    for key in keys:
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return default
+    return current
+
+
+def sanitize_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Clean string fields in a list of data records by stripping whitespace."""
+    sanitized_records = []
+    for record in records:
+        cleaned = {}
+        for k, v in record.items():
+            cleaned[k] = v.strip() if isinstance(v, str) else v
+        sanitized_records.append(cleaned)
+    return sanitized_records
