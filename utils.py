@@ -1,38 +1,26 @@
-"""Data handling utilities for automation workflows."""
+import json
+from typing import Any, Dict, Optional
 
-from typing import Any, Dict, List, Optional
+def safe_load_json(file_path: str) -> Optional[Dict[str, Any]]:
+    """Reads and parses a JSON file with basic error handling."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Data loading error in {file_path}: {e}")
+        return None
 
-
-def flatten_dict(data: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
-    """Recursively flatten a nested dictionary using key paths."""
-    items: List[tuple] = []
-    for key, value in data.items():
-        new_key = f"{parent_key}{sep}{key}" if parent_key else str(key)
-        if isinstance(value, dict):
-            items.extend(flatten_dict(value, new_key, sep=sep).items())
+def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
+    """Flattens nested dictionaries into a single level."""
+    items = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
         else:
-            items.append((new_key, value))
+            items.append((new_key, v))
     return dict(items)
 
-
-def get_nested_value(data: Dict[str, Any], path: str, default: Optional[Any] = None, sep: str = ".") -> Any:
-    """Extract value from nested dictionary using dot-delimited path string."""
-    keys = path.split(sep)
-    current = data
-    for key in keys:
-        if isinstance(current, dict) and key in current:
-            current = current[key]
-        else:
-            return default
-    return current
-
-
-def sanitize_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Clean string fields in a list of data records by stripping whitespace."""
-    sanitized_records = []
-    for record in records:
-        cleaned = {}
-        for k, v in record.items():
-            cleaned[k] = v.strip() if isinstance(v, str) else v
-        sanitized_records.append(cleaned)
-    return sanitized_records
+def filter_by_keys(data: Dict[str, Any], keys: list) -> Dict[str, Any]:
+    """Filters dictionary to include only allowed keys."""
+    return {k: v for k, v in data.items() if k in keys}
