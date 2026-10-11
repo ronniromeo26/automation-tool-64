@@ -1,35 +1,34 @@
+import json
 import os
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
-class Config:
-    """Manages application settings and environment variables."""
+DEFAULT_CONFIG = {
+    "timeout": 30,
+    "retries": 3,
+    "log_level": "INFO",
+    "enabled": True
+}
 
-    def __init__(self, env: str = "development") -> None:
-        self.env: str = env
-        self.settings: Dict[str, Any] = self._load_defaults()
+def load_config(config_path: str = "config.json") -> Dict[str, Any]:
+    """Loads configuration from a JSON file with defaults."""
+    config = DEFAULT_CONFIG.copy()
 
-    def _load_defaults(self) -> Dict[str, Any]:
-        """Initializes default configuration parameters."""
-        return {
-            "timeout": 30,
-            "retries": 3,
-            "debug": self.env == "development"
-        }
+    if not os.path.exists(config_path):
+        return config
 
-    def get(self, key: str, default: Optional[Any] = None) -> Any:
-        """Retrieves a setting value by key."""
-        return self.settings.get(key, default)
+    try:
+        with open(config_path, "r") as f:
+            user_config = json.load(f)
+            config.update(user_config)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"Warning: could not load config file: {e}. Using defaults.")
 
-    def update(self, key: str, value: Any) -> None:
-        """Updates or adds a setting value."""
-        self.settings[key] = value
+    return config
 
-    @classmethod
-    def from_env(cls, prefix: str = "APP_") -> "Config":
-        """Creates a config instance from environment variables."""
-        instance = cls()
-        for key, value in os.environ.items():
-            if key.startswith(prefix):
-                clean_key = key[len(prefix):].lower()
-                instance.update(clean_key, value)
-        return instance
+def save_config(config: Dict[str, Any], config_path: str = "config.json") -> None:
+    """Persists configuration dictionary to a JSON file."""
+    try:
+        with open(config_path, "w") as f:
+            json.dump(config, f, indent=4)
+    except IOError as e:
+        print(f"Error: failed to save config: {e}")
