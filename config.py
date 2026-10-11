@@ -1,53 +1,35 @@
-import json
 import os
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Dict, Any, Optional
 
-DEFAULT_CONFIG: Dict[str, Any] = {
-    "timeout": 30,
-    "max_retries": 3,
-    "log_level": "INFO",
-    "output_dir": "./output",
-    "concurrent_jobs": 4,
-    "enable_cache": True,
-}
+class Config:
+    """Manages application settings and environment variables."""
 
+    def __init__(self, env: str = "development") -> None:
+        self.env: str = env
+        self.settings: Dict[str, Any] = self._load_defaults()
 
-class ConfigLoader:
-    """Handles loading and merging application configuration settings."""
-
-    def __init__(self, config_path: Optional[str] = None):
-        self.config_path = Path(config_path) if config_path else None
-
-    def load(self) -> Dict[str, Any]:
-        """Load configuration from defaults, JSON file, and environment variables."""
-        config = DEFAULT_CONFIG.copy()
-
-        # Load from JSON file if path is valid and exists
-        if self.config_path and self.config_path.is_file():
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    file_config = json.load(f)
-                    if isinstance(file_config, dict):
-                        config.update(file_config)
-            except (json.JSONDecodeError, OSError) as err:
-                print(f"Warning: Failed to load config file ({err}). Using defaults.")
-
-        # Override settings with matching environment variables
-        env_mappings = {
-            "AUTO_TIMEOUT": ("timeout", int),
-            "AUTO_MAX_RETRIES": ("max_retries", int),
-            "AUTO_LOG_LEVEL": ("log_level", str),
-            "AUTO_OUTPUT_DIR": ("output_dir", str),
-            "AUTO_CONCURRENT_JOBS": ("concurrent_jobs", int),
+    def _load_defaults(self) -> Dict[str, Any]:
+        """Initializes default configuration parameters."""
+        return {
+            "timeout": 30,
+            "retries": 3,
+            "debug": self.env == "development"
         }
 
-        for env_var, (config_key, target_type) in env_mappings.items():
-            val = os.getenv(env_var)
-            if val is not None:
-                try:
-                    config[config_key] = target_type(val)
-                except ValueError:
-                    pass
+    def get(self, key: str, default: Optional[Any] = None) -> Any:
+        """Retrieves a setting value by key."""
+        return self.settings.get(key, default)
 
-        return config
+    def update(self, key: str, value: Any) -> None:
+        """Updates or adds a setting value."""
+        self.settings[key] = value
+
+    @classmethod
+    def from_env(cls, prefix: str = "APP_") -> "Config":
+        """Creates a config instance from environment variables."""
+        instance = cls()
+        for key, value in os.environ.items():
+            if key.startswith(prefix):
+                clean_key = key[len(prefix):].lower()
+                instance.update(clean_key, value)
+        return instance
