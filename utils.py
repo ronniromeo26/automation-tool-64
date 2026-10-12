@@ -1,28 +1,49 @@
-import time
 import functools
 import logging
+import random
+import time
+from typing import Any, Callable, Tuple, Type
 
 logger = logging.getLogger(__name__)
 
-def retry_operation(max_attempts=3, delay=2, backoff=2):
-    """Decorator for retrying network operations with exponential backoff."""
-    def decorator(func):
+
+def retry_network_op(
+    max_retries: int = 3,
+    backoff_factor: float = 1.5,
+    jitter: bool = True,
+    retry_exceptions: Tuple[Type[Exception], ...] = (Exception,),
+) -> Callable:
+    """Decorator that retries network operations with exponential backoff and jitter."""
+    def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            attempts = 0
-            current_delay = delay
-            while attempts < max_attempts:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            delay = 1.0
+            for attempt in range(1, max_retries + 1):
                 try:
                     return func(*args, **kwargs)
-                except (ConnectionError, TimeoutError) as e:
-                    attempts += 1
-                    if attempts == max_attempts:
-                        logger.error(f"Final attempt failed for {func.__name__}")
-                        raise e
-                    
-                    logger.warning(f"Attempt {attempts} failed: {e}. Retrying in {current_delay}s...")
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-            return None
+                except retry_exceptions as err:
+                    if attempt == max_retries:
+                        logger.error(
+                            "Operation '%s' failed after %d attempts: %s",
+                            func.__name__,
+                            max_retries,
+                            err,
+                        )
+                        raise
+
+                    sleep_time = delay * (backoff_factor ** (attempt - 1))
+                    if jitter:
+                        sleep_time += random.uniform(0, 0.5 * sleep_time)
+
+                    logger.warning(
+                        "Attempt %d/%d for '%s' failed (%s). Retrying in %.2fs...",
+                        attempt,
+                        max_retries,
+                        func.__name__,
+                        type(err).__name__,
+                        sleep_time,
+                    )
+                    time.sleep(sleep_time)
+
         return wrapper
     return decorator
