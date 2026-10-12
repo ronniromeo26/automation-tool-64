@@ -1,45 +1,37 @@
-from typing import Any, Dict, List
+import functools
+import time
+import logging
+from typing import Callable, Any
 
-def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '_') -> Dict[str, Any]:
-    """Flattens a nested dictionary, joining keys with a separator."""
-    items: List = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        elif isinstance(v, list):
-            for i, item in enumerate(v):
-                if isinstance(item, dict):
-                    items.extend(flatten_dict(item, f"{new_key}{sep}{i}", sep=sep).items())
-                else:
-                    items.append((f"{new_key}{sep}{i}", item))
-        else:
-            items.append((new_key, v))
-    return dict(items)
+logger = logging.getLogger('automation-tool-64')
 
-def clean_data(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively removes keys with None values or empty strings/dicts/lists."""
-    cleaned = {}
-    for k, v in data.items():
-        if v is None or v == "":
-            continue
-        if isinstance(v, dict):
-            nested = clean_data(v)
-            if nested:
-                cleaned[k] = nested
-        elif isinstance(v, list):
-            cleaned_list = []
-            for item in v:
-                if isinstance(item, dict):
-                    item_cleaned = clean_data(item)
-                    if item_cleaned:
-                        cleaned_list.append(item_cleaned)
-                elif item is not None and item != "":
-                    cleaned_list.append(item)
-            if cleaned_list:
-                cleaned[k] = cleaned_list
-        else:
-            if isinstance(v, str):
-                v = v.strip()
-            cleaned[k] = v
-    return cleaned
+CACHE_TTL = 300
+
+_cache = {}
+
+def memoize_with_expiry(func: Callable) -> Callable:
+    """Decorator to cache function results with a time-to-live mechanism."""
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        now = time.time()
+
+        if key in _cache:
+            result, timestamp = _cache[key]
+            if now - timestamp < CACHE_TTL:
+                return result
+
+        result = func(*args, **kwargs)
+        _cache[key] = (result, now)
+        return result
+    return wrapper
+
+def batch_process(items: list, batch_size: int = 100):
+    """Generator to yield chunks from a list for memory efficiency."""
+    for i in range(0, len(items), batch_size):
+        yield items[i:i + batch_size]
+
+def clear_cache() -> None:
+    """Clears the internal memoization storage."""
+    _cache.clear()
+    logger.info("cache storage cleared")
