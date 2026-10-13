@@ -2,30 +2,38 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 
-def setup_logger(name: str, log_file: str = "automation.log") -> logging.Logger:
-    """Configures a rotating file logger for automation tasks."""
+# configuration for automation-tool-64 logging
+LOG_FILE = "automation.log"
+MAX_BYTES = 5 * 1024 * 1024
+BACKUP_COUNT = 3
+
+def setup_logger(name: str = "automation-tool") -> logging.Logger:
+    """Configures a rotating file logger instance."""
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
-    # Prevent duplicate handlers if logger is already configured
+    # avoid duplicate handlers if initialized multiple times
     if not logger.handlers:
-        # Rotate logs after 5MB, keep 3 backups
-        handler = RotatingFileHandler(
-            log_file, 
-            maxBytes=5 * 1024 * 1024, 
-            backupCount=3
-        )
-        
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+
+        # rotation setup: 5MB limit per file
+        handler = RotatingFileHandler(
+            LOG_FILE, 
+            maxBytes=MAX_BYTES, 
+            backupCount=BACKUP_COUNT
         )
         handler.setFormatter(formatter)
-        
         logger.addHandler(handler)
-        
-        # Optional: Add stream handler for console output
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+
+        # stream output for console visibility
+        console = logging.StreamHandler()
+        console.setFormatter(formatter)
+        logger.addHandler(console)
 
     return logger
+
+if __name__ == "__main__":
+    log = setup_logger()
+    log.info("logger initialization complete")
