@@ -1,49 +1,27 @@
-import functools
-import logging
-import random
 import time
-from typing import Any, Callable, Tuple, Type
+from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+def sanitize_input(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Removes empty strings and null values from a dictionary."""
+    return {k: v for k, v in data.items() if v is not None and v != ""}
 
+def format_timestamp(ts: float, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """Converts a unix timestamp into a readable string format."""
+    return time.strftime(fmt, time.localtime(ts))
 
-def retry_network_op(
-    max_retries: int = 3,
-    backoff_factor: float = 1.5,
-    jitter: bool = True,
-    retry_exceptions: Tuple[Type[Exception], ...] = (Exception,),
-) -> Callable:
-    """Decorator that retries network operations with exponential backoff and jitter."""
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            delay = 1.0
-            for attempt in range(1, max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except retry_exceptions as err:
-                    if attempt == max_retries:
-                        logger.error(
-                            "Operation '%s' failed after %d attempts: %s",
-                            func.__name__,
-                            max_retries,
-                            err,
-                        )
-                        raise
+def chunk_list(items: List[Any], size: int) -> List[List[Any]]:
+    """Splits a large list into smaller sub-lists of specified size."""
+    if size <= 0:
+        raise ValueError("Chunk size must be greater than zero")
+    return [items[i:i + size] for i in range(0, len(items), size)]
 
-                    sleep_time = delay * (backoff_factor ** (attempt - 1))
-                    if jitter:
-                        sleep_time += random.uniform(0, 0.5 * sleep_time)
-
-                    logger.warning(
-                        "Attempt %d/%d for '%s' failed (%s). Retrying in %.2fs...",
-                        attempt,
-                        max_retries,
-                        func.__name__,
-                        type(err).__name__,
-                        sleep_time,
-                    )
-                    time.sleep(sleep_time)
-
-        return wrapper
-    return decorator
+def retry_operation(func: callable, retries: int = 3, delay: float = 1.0) -> Optional[Any]:
+    """Executes a function with simple retry logic on failure."""
+    for attempt in range(retries):
+        try:
+            return func()
+        except Exception:
+            if attempt == retries - 1:
+                raise
+            time.sleep(delay)
+    return None
