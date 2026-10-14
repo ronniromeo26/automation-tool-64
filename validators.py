@@ -1,30 +1,40 @@
 import re
+from typing import Any, Dict, Optional
 
-class InputValidator:
-    """Handles validation logic for processing jobs."""
+class ValidationError(Exception):
+    """Custom exception for input validation failures."""
+    pass
 
-    def __init__(self):
-        # Regex for standard job ID format (e.g., JOB-12345)
-        self.job_id_pattern = re.compile(r'^JOB-\d{5}$')
-        self.min_priority = 1
-        self.max_priority = 10
+def validate_payload(data: Dict[str, Any]) -> bool:
+    """Validates mandatory schema fields for processing tasks."""
+    required_fields = {"task_id": int, "payload": dict, "priority": int}
 
-    def validate_job_data(self, data: dict) -> bool:
-        """Checks if input dictionary contains valid keys and types."""
-        job_id = data.get("job_id")
-        priority = data.get("priority")
+    for field, field_type in required_fields.items():
+        if field not in data:
+            raise ValidationError(f"Missing required field: {field}")
+        if not isinstance(data[field], field_type):
+            raise ValidationError(f"Invalid type for {field}: expected {field_type.__name__}")
 
-        if not isinstance(job_id, str) or not self.job_id_pattern.match(job_id):
-            return False
+    if not (1 <= data["priority"] <= 10):
+        raise ValidationError("Priority must be between 1 and 10")
 
-        if not isinstance(priority, int) or not (self.min_priority <= priority <= self.max_priority):
-            return False
+    return True
 
-        return True
+def sanitize_input(value: str) -> str:
+    """Removes potentially malicious shell injection characters."""
+    if not isinstance(value, str):
+        return ""
+    # Allow only alphanumeric and underscores
+    return re.sub(r'[^a-zA-Z0-9_]', '', value)
 
-    @staticmethod
-    def sanitize_payload(payload: str) -> str:
-        """Removes potential injection characters."""
-        if not isinstance(payload, str):
-            return ""
-        return re.sub(r'[^a-zA-Z0-9\s]', '', payload)
+def validate_loop_input(data: Any) -> Optional[Dict[str, Any]]:
+    """Main entry point for loop input integrity checks."""
+    if not isinstance(data, dict):
+        return None
+    
+    try:
+        if validate_payload(data):
+            return data
+    except ValidationError:
+        return None
+    return None
