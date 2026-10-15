@@ -1,40 +1,32 @@
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
-class ValidationError(Exception):
-    """Custom exception for input validation failures."""
-    pass
-
-def validate_payload(data: Dict[str, Any]) -> bool:
-    """Validates mandatory schema fields for processing tasks."""
-    required_fields = {"task_id": int, "payload": dict, "priority": int}
-
+def validate_input_schema(data: dict) -> bool:
+    """
+    Validates core input structure and field requirements.
+    Ensures 'task_id' is alphanumeric and 'payload' is dict.
+    """
+    required_fields = {'task_id': str, 'payload': dict}
+    
     for field, field_type in required_fields.items():
-        if field not in data:
-            raise ValidationError(f"Missing required field: {field}")
-        if not isinstance(data[field], field_type):
-            raise ValidationError(f"Invalid type for {field}: expected {field_type.__name__}")
-
-    if not (1 <= data["priority"] <= 10):
-        raise ValidationError("Priority must be between 1 and 10")
-
+        if field not in data or not isinstance(data[field], field_type):
+            return False
+            
+    # Validate task_id pattern (alphanumeric, 4-12 chars)
+    if not re.match(r'^[a-zA-Z0-9]{4,12}$', data['task_id']):
+        return False
+        
     return True
 
-def sanitize_input(value: str) -> str:
-    """Removes potentially malicious shell injection characters."""
-    if not isinstance(value, str):
-        return ""
-    # Allow only alphanumeric and underscores
-    return re.sub(r'[^a-zA-Z0-9_]', '', value)
+def sanitize_payload(payload: dict) -> dict:
+    """
+    Removes null entries and limits key count.
+    """
+    sanitized = {k: v for k, v in payload.items() if v is not None}
+    return dict(list(sanitized.items())[:50])
 
-def validate_loop_input(data: Any) -> Optional[Dict[str, Any]]:
-    """Main entry point for loop input integrity checks."""
-    if not isinstance(data, dict):
-        return None
-    
-    try:
-        if validate_payload(data):
-            return data
-    except ValidationError:
-        return None
-    return None
+if __name__ == '__main__':
+    # Test validation logic
+    sample = {'task_id': 'proc001', 'payload': {'mode': 'fast'}}
+    is_valid = validate_input_schema(sample)
+    print(f'Input validation result: {is_valid}')
