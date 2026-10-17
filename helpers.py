@@ -1,41 +1,46 @@
 import logging
-import os
-from typing import Any, Optional
+from typing import Any, Callable, Sequence, Type, Union
 
-logger = logging.getLogger('automation-tool-64')
+logger = logging.getLogger(__name__)
 
-class DataProcessingError(Exception):
-    """Custom exception for operational flow issues."""
-    pass
 
-def safe_load_config(file_path: str) -> dict:
-    """Reads configuration file with fallback and error validation."""
-    if not os.path.exists(file_path):
-        logger.error(f"config file missing at {file_path}")
-        return {}
+def safe_get_nested(data: Any, path: Sequence[Union[str, int]], default: Any = None) -> Any:
+    """Safely retrieve a value from nested dictionaries or lists using a key path."""
+    current = data
+    for key in path:
+        if current is None:
+            return default
+        try:
+            if isinstance(current, dict) and isinstance(key, str):
+                current = current.get(key, default)
+            elif isinstance(current, (list, tuple)) and isinstance(key, int):
+                if 0 <= key < len(current):
+                    current = current[key]
+                else:
+                    return default
+            else:
+                return default
+        except (TypeError, KeyError, IndexError, AttributeError) as err:
+            logger.debug(f"Error accessing key '{key}' in path {path}: {err}")
+            return default
+    return current
 
+
+def safe_cast(value: Any, target_type: Type, default: Any = None) -> Any:
+    """Safely cast a value to a target type, returning default on failure."""
+    if value is None:
+        return default
     try:
-        with open(file_path, 'r') as f:
-            import json
-            return json.load(f)
-    except (json.JSONDecodeError, IOError) as e:
-        logger.warning(f"failed to parse config {file_path}: {e}")
-        return {}
+        return target_type(value)
+    except (ValueError, TypeError) as err:
+        logger.debug(f"Failed to cast '{value}' to {target_type.__name__}: {err}")
+        return default
 
-def process_payload(data: Any) -> Optional[dict]:
-    """Validates input structure before processing downstream."""
+
+def execute_with_fallback(func: Callable, fallback_val: Any, *args: Any, **kwargs: Any) -> Any:
+    """Execute a callable with args and return fallback_val if an exception occurs."""
     try:
-        if not isinstance(data, dict) or 'id' not in data:
-            raise DataProcessingError("invalid payload schema")
-            
-        return {
-            "processed": True,
-            "id": data['id'],
-            "status": "success"
-        }
-    except DataProcessingError as e:
-        logger.error(f"payload error: {e}")
-        return None
-    except Exception as e:
-        logger.critical(f"unexpected failure: {e}")
-        return None
+        return func(*args, **kwargs)
+    except Exception as err:
+        logger.warning(f"Operation failed with error: {err}. Returning fallback.")
+        return fallback_val
