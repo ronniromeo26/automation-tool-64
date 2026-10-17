@@ -1,32 +1,35 @@
 import re
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
-def validate_input_schema(data: dict) -> bool:
+def validate_payload(data: Any) -> Dict[str, Any]:
     """
-    Validates core input structure and field requirements.
-    Ensures 'task_id' is alphanumeric and 'payload' is dict.
+    Validates input schema for automation processing.
+    Ensures required fields exist and match expected types.
     """
-    required_fields = {'task_id': str, 'payload': dict}
-    
-    for field, field_type in required_fields.items():
-        if field not in data or not isinstance(data[field], field_type):
-            return False
-            
-    # Validate task_id pattern (alphanumeric, 4-12 chars)
-    if not re.match(r'^[a-zA-Z0-9]{4,12}$', data['task_id']):
+    if not isinstance(data, dict):
+        raise ValueError("Payload must be a dictionary")
+
+    required_fields = {"task_id": str, "priority": int}
+    for field, expected_type in required_fields.items():
+        if field not in data:
+            raise KeyError(f"Missing required field: {field}")
+        if not isinstance(data[field], expected_type):
+            raise TypeError(f"Field {field} must be of type {expected_type.__name__}")
+
+    return data
+
+def validate_task_id_format(task_id: str) -> bool:
+    """
+    Verifies task ID follows standard naming convention.
+    Allows alphanumeric strings with underscores/dashes.
+    """
+    pattern = r"^[a-zA-Z0-9_-]+$"
+    if not re.match(pattern, task_id):
         return False
-        
     return True
 
-def sanitize_payload(payload: dict) -> dict:
+def sanitize_input(value: str) -> str:
     """
-    Removes null entries and limits key count.
+    Basic sanitization to strip potential command injection characters.
     """
-    sanitized = {k: v for k, v in payload.items() if v is not None}
-    return dict(list(sanitized.items())[:50])
-
-if __name__ == '__main__':
-    # Test validation logic
-    sample = {'task_id': 'proc001', 'payload': {'mode': 'fast'}}
-    is_valid = validate_input_schema(sample)
-    print(f'Input validation result: {is_valid}')
+    return re.sub(r"[^a-zA-Z0-9_\s-]/", "", value).strip()
