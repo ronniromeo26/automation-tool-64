@@ -1,53 +1,31 @@
-import json
 import os
+import json
 from typing import Any, Dict
 
-DEFAULT_CONFIG: Dict[str, Any] = {
-    "app_name": "AutomationTool64",
-    "version": "1.0.0",
-    "debug": False,
-    "log_level": "INFO",
+DEFAULT_CONFIG = {
     "timeout": 30,
-    "max_retries": 3,
-    "paths": {
-        "output_dir": "./output",
-        "log_dir": "./logs",
-    },
+    "retries": 3,
+    "log_level": "INFO",
+    "enabled": True
 }
 
+def load_config(config_path: str = "config.json") -> Dict[str, Any]:
+    """Loads configuration from file or returns defaults."""
+    config = DEFAULT_CONFIG.copy()
 
-class ConfigLoader:
-    """Loads configuration files with sensible default fallbacks."""
+    if not os.path.exists(config_path):
+        return config
 
-    def __init__(self, config_path: str = "config.json"):
-        self.config_path = config_path
-        self.config: Dict[str, Any] = DEFAULT_CONFIG.copy()
+    try:
+        with open(config_path, "r") as f:
+            user_config = json.load(f)
+            config.update(user_config)
+    except (json.JSONDecodeError, IOError):
+        pass
 
-    def _deep_merge(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-        """Recursively merge user overrides into default dictionary."""
-        merged = base.copy()
-        for key, value in override.items():
-            if isinstance(value, dict) and key in merged and isinstance(merged[key], dict):
-                merged[key] = self._deep_merge(merged[key], value)
-            else:
-                merged[key] = value
-        return merged
+    return config
 
-    def load(self) -> Dict[str, Any]:
-        """Loads configuration file if present, applying overrides."""
-        if not os.path.exists(self.config_path):
-            return self.config
-
-        try:
-            with open(self.config_path, "r", encoding="utf-8") as file:
-                user_config = json.load(file)
-                if isinstance(user_config, dict):
-                    self.config = self._deep_merge(DEFAULT_CONFIG, user_config)
-        except (json.JSONDecodeError, OSError) as err:
-            print(f"Warning: Failed to load {self.config_path} ({err}). Using defaults.")
-
-        return self.config
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Retrieve a configuration option by key."""
-        return self.config.get(key, default)
+if __name__ == "__main__":
+    # Example usage for automation-tool-64
+    app_settings = load_config()
+    print(f"Loaded settings: {app_settings}")
