@@ -1,35 +1,52 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-class DataProcessor:
-    """Handles automated data ingestion and transformation tasks."""
 
-    def process_payload(self, data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        # validation of input structure
-        if not isinstance(data, dict):
-            logger.error("invalid payload type: expected dict, got %s", type(data))
-            return {"status": "error", "message": "invalid input format"}
+def validate_payload(data: Dict[str, Any]) -> bool:
+    """Validate incoming payload structure and required fields."""
+    if not isinstance(data, dict):
+        logging.warning("Invalid payload format: expected a dictionary.")
+        return False
+
+    required_keys = ["id", "action", "params"]
+    missing = [key for key in required_keys if key not in data]
+    if missing:
+        logging.warning(f"Missing required payload keys: {missing}")
+        return False
+
+    if not isinstance(data["id"], (int, str)) or not str(data["id"]).strip():
+        logging.warning("Invalid task ID: must be a non-empty string or integer.")
+        return False
+
+    if not isinstance(data["params"], dict):
+        logging.warning("Invalid params format: expected a dictionary.")
+        return False
+
+    return True
+
+
+def process_batch(tasks: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Process a batch of tasks with strict input validation in the main loop."""
+    stats = {"processed": 0, "skipped": 0, "failed": 0}
+
+    for idx, task in enumerate(tasks):
+        logging.info(f"Evaluating item at index {idx}...")
+
+        # Input validation check before execution
+        if not validate_payload(task):
+            logging.warning(f"Skipping item at index {idx} due to validation failure.")
+            stats["skipped"] += 1
+            continue
 
         try:
-            # simulated resource-heavy logic
-            result = self._execute_transformation(data)
-            return {"status": "success", "data": result}
+            task_id = task["id"]
+            action = task["action"]
+            logging.info(f"Executing task [{task_id}] with action '{action}'")
+            stats["processed"] += 1
+        except Exception as err:
+            logging.error(f"Error executing task [{task.get('id')}]: {err}")
+            stats["failed"] += 1
 
-        except KeyError as e:
-            logger.warning("missing mandatory field in payload: %s", e)
-            return {"status": "error", "message": f"missing field: {e}"}
-        except ValueError as e:
-            logger.error("data transformation failure: %s", e)
-            return {"status": "error", "message": "transformation failed"}
-        except Exception as e:
-            logger.exception("unexpected system error during processing")
-            return {"status": "error", "message": "internal server error"}
-
-    def _execute_transformation(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        if "id" not in data:
-            raise KeyError("id")
-        if data.get("value", 0) < 0:
-            raise ValueError("negative value not allowed")
-        return {"id": data["id"], "processed": True}
+    return stats
