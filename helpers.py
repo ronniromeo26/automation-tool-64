@@ -1,46 +1,43 @@
+import os
+import json
 import logging
-from typing import Any, Callable, Sequence, Type, Union
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
+# Configure basic logger for automation-tool-64
+logger = logging.getLogger('automation-tool-64')
 
-
-def safe_get_nested(data: Any, path: Sequence[Union[str, int]], default: Any = None) -> Any:
-    """Safely retrieve a value from nested dictionaries or lists using a key path."""
-    current = data
-    for key in path:
-        if current is None:
-            return default
-        try:
-            if isinstance(current, dict) and isinstance(key, str):
-                current = current.get(key, default)
-            elif isinstance(current, (list, tuple)) and isinstance(key, int):
-                if 0 <= key < len(current):
-                    current = current[key]
-                else:
-                    return default
-            else:
-                return default
-        except (TypeError, KeyError, IndexError, AttributeError) as err:
-            logger.debug(f"Error accessing key '{key}' in path {path}: {err}")
-            return default
-    return current
-
-
-def safe_cast(value: Any, target_type: Type, default: Any = None) -> Any:
-    """Safely cast a value to a target type, returning default on failure."""
-    if value is None:
-        return default
+def load_json_config(file_path: str) -> Dict[str, Any]:
+    """Loads and parses a JSON configuration file."""
+    path = Path(file_path)
+    if not path.exists():
+        logger.error(f"Config file missing: {file_path}")
+        return {}
+    
     try:
-        return target_type(value)
-    except (ValueError, TypeError) as err:
-        logger.debug(f"Failed to cast '{value}' to {target_type.__name__}: {err}")
-        return default
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        logger.warning(f"Error reading config {file_path}: {e}")
+        return {}
 
-
-def execute_with_fallback(func: Callable, fallback_val: Any, *args: Any, **kwargs: Any) -> Any:
-    """Execute a callable with args and return fallback_val if an exception occurs."""
+def ensure_directory(dir_path: str) -> bool:
+    """Creates a directory if it does not exist."""
     try:
-        return func(*args, **kwargs)
-    except Exception as err:
-        logger.warning(f"Operation failed with error: {err}. Returning fallback.")
-        return fallback_val
+        Path(dir_path).mkdir(parents=True, exist_ok=True)
+        return True
+    except Exception as e:
+        logger.error(f"Directory creation failed for {dir_path}: {e}")
+        return False
+
+def get_env_variable(key: str, default: Optional[str] = None) -> str:
+    """Safely retrieves environment variables with default fallback."""
+    return os.getenv(key, default or "")
+
+def format_byte_size(size_bytes: int) -> str:
+    """Converts byte counts into human readable strings."""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} TB"
