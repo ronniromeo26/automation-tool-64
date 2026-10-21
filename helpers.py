@@ -1,43 +1,38 @@
 import os
 import json
 import logging
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
-# Configure basic logger for automation-tool-64
-logger = logging.getLogger('automation-tool-64')
+logger = logging.getLogger(__name__)
 
-def load_json_config(file_path: str) -> Dict[str, Any]:
-    """Loads and parses a JSON configuration file."""
-    path = Path(file_path)
-    if not path.exists():
-        logger.error(f"Config file missing: {file_path}")
-        return {}
-    
+def load_json(filepath: str) -> Optional[dict]:
+    """Reads and parses a JSON file from disk."""
+    if not os.path.exists(filepath):
+        logger.error(f"File not found: {filepath}")
+        return None
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError) as e:
-        logger.warning(f"Error reading config {file_path}: {e}")
-        return {}
+        logger.error(f"Failed to load JSON: {e}")
+        return None
 
-def ensure_directory(dir_path: str) -> bool:
-    """Creates a directory if it does not exist."""
+def save_json(data: Any, filepath: str) -> bool:
+    """Writes data structure to a JSON file."""
     try:
-        Path(dir_path).mkdir(parents=True, exist_ok=True)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4)
         return True
-    except Exception as e:
-        logger.error(f"Directory creation failed for {dir_path}: {e}")
+    except IOError as e:
+        logger.error(f"Failed to save JSON: {e}")
         return False
 
-def get_env_variable(key: str, default: Optional[str] = None) -> str:
-    """Safely retrieves environment variables with default fallback."""
-    return os.getenv(key, default or "")
+def ensure_directory(path: str) -> None:
+    """Creates target directory if it does not exist."""
+    if not os.path.exists(path):
+        os.makedirs(path)
+        logger.info(f"Created directory: {path}")
 
-def format_byte_size(size_bytes: int) -> str:
-    """Converts byte counts into human readable strings."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024.0:
-            return f"{size_bytes:.2f} {unit}"
-        size_bytes /= 1024.0
-    return f"{size_bytes:.2f} TB"
+def get_env_variable(key: str, default: Any = None) -> Any:
+    """Retrieves environment variable with fallback default."""
+    return os.environ.get(key, default)
