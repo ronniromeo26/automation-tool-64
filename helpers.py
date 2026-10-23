@@ -1,38 +1,45 @@
 import logging
-import os
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
-logger = logging.getLogger('automation-tool-64')
+# Logger setup for automation-tool-64
+logger = logging.getLogger(__name__)
 
-def safe_load_env(key: str, default: Optional[str] = None) -> str:
-    """Retrieves environment variable with fallback."""
+def validate_input_data(data: Dict[str, Any]) -> bool:
+    """Validates dictionary structure before processing."""
+    required_keys = {"task_id", "payload", "priority"}
+    
+    if not isinstance(data, dict):
+        logger.error("Invalid input type: expected dict")
+        return False
+
+    if not required_keys.issubset(data.keys()):
+        missing = required_keys - data.keys()
+        logger.warning(f"Missing required keys in input: {missing}")
+        return False
+
+    if not isinstance(data.get("task_id"), int):
+        logger.error("Validation failure: task_id must be integer")
+        return False
+
+    return True
+
+def sanitize_payload(payload: Any) -> Optional[str]:
+    """Ensures payload string integrity."""
     try:
-        value = os.getenv(key)
-        if value is None:
-            if default is None:
-                raise KeyError(f"Environment variable {key} not set")
-            return default
-        return value
+        if isinstance(payload, str):
+            return payload.strip()[:1024]
+        return str(payload)
     except Exception as e:
-        logger.error(f"Unexpected error reading {key}: {e}")
-        raise
+        logger.error(f"Sanitization error: {e}")
+        return None
 
-def parse_config_int(value: Any) -> int:
-    """Safely converts config values to integers."""
-    try:
-        return int(value)
-    except (ValueError, TypeError) as e:
-        logger.warning(f"Invalid integer config '{value}': {e}. Defaulting to 0.")
-        return 0
-
-def execute_task(func: callable, *args: Any, **kwargs: Any) -> Any:
-    """Wraps task execution with generic error handling."""
-    try:
-        return func(*args, **kwargs)
-    except PermissionError:
-        logger.error("Insufficient permissions to perform task")
-    except FileNotFoundError:
-        logger.error("Required file missing from file system")
-    except Exception as e:
-        logger.exception(f"Unexpected critical failure: {e}")
-    return None
+def process_main_loop(queue_items: list):
+    """Main processing iteration with validation logic."""
+    for item in queue_items:
+        if not validate_input_data(item):
+            continue
+            
+        cleaned_payload = sanitize_payload(item["payload"])
+        if cleaned_payload:
+            # Simulate task execution
+            logger.info(f"Processing task {item['task_id']} safely")
