@@ -1,52 +1,47 @@
-import logging
-from typing import Any, Dict, List
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+import concurrent.futures
+from typing import Any, Callable, Dict, List, Tuple
 
 
-def validate_payload(data: Dict[str, Any]) -> bool:
-    """Validate incoming payload structure and required fields."""
-    if not isinstance(data, dict):
-        logging.warning("Invalid payload format: expected a dictionary.")
-        return False
+class BatchProcessor:
+    """Optimized batch task processor using thread pools and result caching."""
 
-    required_keys = ["id", "action", "params"]
-    missing = [key for key in required_keys if key not in data]
-    if missing:
-        logging.warning(f"Missing required payload keys: {missing}")
-        return False
+    def __init__(self, max_workers: int = 4, cache_enabled: bool = True):
+        self.max_workers = max_workers
+        self.cache_enabled = cache_enabled
+        self._cache: Dict[str, Any] = {}
 
-    if not isinstance(data["id"], (int, str)) or not str(data["id"]).strip():
-        logging.warning("Invalid task ID: must be a non-empty string or integer.")
-        return False
+    def _generate_key(self, task_name: str, args: Tuple[Any, ...]) -> str:
+        return f"{task_name}:{hash(args)}"
 
-    if not isinstance(data["params"], dict):
-        logging.warning("Invalid params format: expected a dictionary.")
-        return False
+    def process_task(self, func: Callable, task_name: str, *args: Any) -> Any:
+        """Executes a single task with result caching when enabled."""
+        if self.cache_enabled:
+            cache_key = self._generate_key(task_name, args)
+            if cache_key in self._cache:
+                return self._cache[cache_key]
 
-    return True
+            result = func(*args)
+            self._cache[cache_key] = result
+            return result
 
+        return func(*args)
 
-def process_batch(tasks: List[Dict[str, Any]]) -> Dict[str, int]:
-    """Process a batch of tasks with strict input validation in the main loop."""
-    stats = {"processed": 0, "skipped": 0, "failed": 0}
+    def process_batch(
+        self, tasks: List[Tuple[Callable, str, Tuple[Any, ...]]]
+    ) -> List[Any]:
+        """Executes multiple automated tasks concurrently to improve throughput."""
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_workers
+        ) as executor:
+            futures = [
+                executor.submit(self.process_task, func, name, *args)
+                for func, name, args in tasks
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                results.append(future.result())
+        return results
 
-    for idx, task in enumerate(tasks):
-        logging.info(f"Evaluating item at index {idx}...")
-
-        # Input validation check before execution
-        if not validate_payload(task):
-            logging.warning(f"Skipping item at index {idx} due to validation failure.")
-            stats["skipped"] += 1
-            continue
-
-        try:
-            task_id = task["id"]
-            action = task["action"]
-            logging.info(f"Executing task [{task_id}] with action '{action}'")
-            stats["processed"] += 1
-        except Exception as err:
-            logging.error(f"Error executing task [{task.get('id')}]: {err}")
-            stats["failed"] += 1
-
-    return stats
+    def clear_cache(self) -> None:
+        """Flushes the internal result cache."""
+        self._cache.clear()
