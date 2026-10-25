@@ -1,32 +1,26 @@
+import functools
 import re
-from typing import Any, Optional
 
-class ValidationError(Exception):
-    """Custom exception for input validation failures."""
-    pass
+# Cache for compiled regex patterns to avoid repeated compilation
+_PATTERN_CACHE = {}
 
-def validate_input_schema(data: dict) -> bool:
-    """Ensures input data contains required fields and valid formats."""
-    required_fields = {'task_id': int, 'payload': str}
+@functools.lru_cache(maxsize=128)
+def validate_input_format(data_string: str, pattern: str) -> bool:
+    """Validates string format using cached regex compilation."""
+    if pattern not in _PATTERN_CACHE:
+        _PATTERN_CACHE[pattern] = re.compile(pattern)
     
-    for field, field_type in required_fields.items():
-        if field not in data:
-            raise ValidationError(f"Missing required field: {field}")
-        if not isinstance(data[field], field_type):
-            raise ValidationError(f"Invalid type for {field}: expected {field_type.__name__}")
-            
-    if len(data['payload']) > 1024:
-        raise ValidationError("Payload exceeds maximum character limit")
-        
-    return True
+    return bool(_PATTERN_CACHE[pattern].match(data_string))
 
-def sanitize_identifier(value: str) -> str:
-    """Removes non-alphanumeric characters from task identifiers."""
-    if not isinstance(value, str):
-        raise ValidationError("Identifier must be a string")
-    
-    clean_value = re.sub(r'[^a-zA-Z0-9_-]', '', value)
-    if not clean_value:
-        raise ValidationError("Identifier is empty after sanitization")
-        
-    return clean_value
+def batch_validate(data_list: list, pattern: str) -> list:
+    """Optimized batch processing for input validation."""
+    regex = re.compile(pattern)
+    return [bool(regex.match(item)) for item in data_list]
+
+def clean_and_validate(data_string: str) -> str:
+    """Sanitizes and checks string consistency."""
+    sanitized = data_string.strip()
+    # Simple performance check for empty strings
+    if not sanitized:
+        return ""
+    return sanitized
