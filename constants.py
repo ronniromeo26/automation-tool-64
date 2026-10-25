@@ -1,33 +1,33 @@
-import os
-from pathlib import Path
+from typing import Final, Dict, Any
 
-# Base directories for automation storage
-BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_DATA_DIR = BASE_DIR / "data"
-DEFAULT_LOG_DIR = BASE_DIR / "logs"
+# Configuration constants for automation-tool-64
+DEFAULT_TIMEOUT: Final[int] = 30
+MAX_RETRIES: Final[int] = 3
 
-# Network and process limits
-DEFAULT_TIMEOUT_SECONDS = 30
-MAX_RETRIES = 3
-BACKOFF_FACTOR_SECONDS = 1.5
+# Environment mapping settings
+ENV_VAR_PREFIX: Final[str] = "AT64_"
 
-# File operations and encoding
-DEFAULT_ENCODING = "utf-8"
-DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-DATE_ONLY_FORMAT = "%Y-%m-%d"
+# Supported operation types
+OPERATION_MODES: Final[list[str]] = ["sync", "async", "batch"]
 
-# Execution status tracking state strings
-STATUS_PENDING = "pending"
-STATUS_RUNNING = "running"
-STATUS_SUCCESS = "success"
-STATUS_FAILED = "failed"
+# Default logging configuration
+LOG_FORMAT: Final[str] = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+LOG_LEVEL: Final[str] = "INFO"
 
-# Environment variable lookup keys
-ENV_API_KEY = "AUTOMATION_API_KEY"
-ENV_ENVIRONMENT = "AUTOMATION_ENV"
-ENV_LOG_LEVEL = "AUTOMATION_LOG_LEVEL"
+# System status codes
+STATUS_SUCCESS: Final[int] = 0
+STATUS_FAILURE: Final[int] = 1
 
-# Process termination and exit codes
-EXIT_CODE_SUCCESS = 0
-EXIT_CODE_ERROR = 1
-EXIT_CODE_CONFIG_INVALID = 2
+# API request configuration
+HEADERS: Final[Dict[str, str]] = {
+    "Content-Type": "application/json",
+    "User-Agent": "automation-tool-64-agent"
+}
+
+def get_app_metadata() -> Dict[str, Any]:
+    """Returns the default application metadata configuration."""
+    return {
+        "timeout": DEFAULT_TIMEOUT,
+        "retries": MAX_RETRIES,
+        "modes": OPERATION_MODES
+    }
