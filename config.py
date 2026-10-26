@@ -1,31 +1,25 @@
-import json
 import os
-from typing import Any, Dict
+from pathlib import Path
+from typing import Dict, Any
 
-DEFAULT_CONFIG = {
-    "retries": 3,
-    "timeout": 30,
-    "log_level": "INFO",
-    "enabled": True
-}
+class AppConfig:
+    """Centralized configuration management for automation-tool-64."""
 
-def load_config(config_path: str = "config.json") -> Dict[str, Any]:
-    """
-    Loads configuration from JSON file or returns defaults.
-    """
-    config = DEFAULT_CONFIG.copy()
-    
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r") as f:
-                user_config = json.load(f)
-                config.update(user_config)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: Could not load config {config_path}: {e}. Using defaults.")
-            
-    return config
+    def __init__(self) -> None:
+        self.base_dir: Path = Path(__file__).resolve().parent
+        self.env: str = os.getenv("APP_ENV", "production")
+        self.log_level: str = os.getenv("LOG_LEVEL", "INFO")
+        self.timeout: int = int(os.getenv("APP_TIMEOUT", "30"))
 
-if __name__ == "__main__":
-    # Example usage for automation-tool-64
-    settings = load_config()
-    print(f"Active settings: {settings}")
+    def get_settings(self) -> Dict[str, Any]:
+        """Return dict representation of current settings."""
+        return {
+            "env": self.env,
+            "log_level": self.log_level,
+            "timeout": self.timeout,
+            "base_path": str(self.base_dir)
+        }
+
+def load_config() -> AppConfig:
+    """Factory function to instantiate AppConfig."""
+    return AppConfig()
