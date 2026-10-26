@@ -1,45 +1,65 @@
-import logging
-from typing import Any, Dict, Optional
+import re
+from typing import Any, Dict, List, Optional
 
-# Logger setup for automation-tool-64
-logger = logging.getLogger(__name__)
 
-def validate_input_data(data: Dict[str, Any]) -> bool:
-    """Validates dictionary structure before processing."""
-    required_keys = {"task_id", "payload", "priority"}
-    
-    if not isinstance(data, dict):
-        logger.error("Invalid input type: expected dict")
-        return False
+def sanitize_filename(name: str, replacement: str = "_") -> str:
+    """Sanitize a string to be safe for use as a filename.
 
-    if not required_keys.issubset(data.keys()):
-        missing = required_keys - data.keys()
-        logger.warning(f"Missing required keys in input: {missing}")
-        return False
+    Args:
+        name: Original string to be sanitized.
+        replacement: Character to replace invalid filesystem characters.
 
-    if not isinstance(data.get("task_id"), int):
-        logger.error("Validation failure: task_id must be integer")
-        return False
+    Returns:
+        A cleaned, safe filename string.
+    """
+    sanitized = re.sub(r'[\\/*?:"<>|]', replacement, name)
+    sanitized = re.sub(f"{re.escape(replacement)}+", replacement, sanitized)
+    return sanitized.strip()
 
-    return True
 
-def sanitize_payload(payload: Any) -> Optional[str]:
-    """Ensures payload string integrity."""
-    try:
-        if isinstance(payload, str):
-            return payload.strip()[:1024]
-        return str(payload)
-    except Exception as e:
-        logger.error(f"Sanitization error: {e}")
-        return None
+def flatten_dict(
+    data: Dict[str, Any], parent_key: str = "", sep: str = "."
+) -> Dict[str, Any]:
+    """Flatten a nested dictionary using dot notation for keys.
 
-def process_main_loop(queue_items: list):
-    """Main processing iteration with validation logic."""
-    for item in queue_items:
-        if not validate_input_data(item):
-            continue
-            
-        cleaned_payload = sanitize_payload(item["payload"])
-        if cleaned_payload:
-            # Simulate task execution
-            logger.info(f"Processing task {item['task_id']} safely")
+    Args:
+        data: The dictionary to flatten.
+        parent_key: Accumulated key prefix for recursive calls.
+        sep: Separator character for joined keys.
+
+    Returns:
+        A flat dictionary with string keys.
+    """
+    items: List[tuple] = []
+    for key, value in data.items():
+        new_key = f"{parent_key}{sep}{key}" if parent_key else key
+        if isinstance(value, dict):
+            items.extend(flatten_dict(value, new_key, sep=sep).items())
+        else:
+            items.append((new_key, value))
+    return dict(items)
+
+
+def format_bytes(size_bytes: int) -> str:
+    """Convert a size in bytes to a readable format with units.
+
+    Args:
+        size_bytes: Number of bytes to convert.
+
+    Returns:
+        Human-readable byte size string.
+    """
+    if size_bytes <= 0:
+        return "0 B"
+
+    units = ["B", "KB", "MB", "GB", "TB"]
+    unit_index = 0
+    size = float(size_bytes)
+
+    while size >= 1024.0 and unit_index < len(units) - 1:
+        size /= 1024.0
+        unit_index += 1
+
+    if unit_index == 0:
+        return f"{int(size)} B"
+    return f"{size:.2f} {units[unit_index]}"
