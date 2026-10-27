@@ -1,55 +1,59 @@
 import logging
-from logging.handlers import RotatingFileHandler
+import sys
 from pathlib import Path
 from typing import Optional
 
 
+class ColoredConsoleFormatter(logging.Formatter):
+    """Format console output with ANSI color codes for readability."""
+
+    GREY = "\x1b[38;20m"
+    YELLOW = "\x1b[33;20m"
+    RED = "\x1b[31;20m"
+    BOLD_RED = "\x1b[31;1m"
+    RESET = "\x1b[0m"
+    LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
+    FORMATS = {
+        logging.DEBUG: GREY + LOG_FORMAT + RESET,
+        logging.INFO: GREY + LOG_FORMAT + RESET,
+        logging.WARNING: YELLOW + LOG_FORMAT + RESET,
+        logging.ERROR: RED + LOG_FORMAT + RESET,
+        logging.CRITICAL: BOLD_RED + LOG_FORMAT + RESET,
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_fmt = self.FORMATS.get(record.levelno, self.LOG_FORMAT)
+        formatter = logging.Formatter(log_fmt, datefmt="%H:%M:%S")
+        return formatter.format(record)
+
+
 def setup_logger(
     name: str = "automation_tool",
-    log_dir: str = "logs",
-    log_file: str = "app.log",
+    log_file: Optional[Path] = None,
     level: int = logging.INFO,
-    max_bytes: int = 5 * 1024 * 1024,
-    backup_count: int = 3,
 ) -> logging.Logger:
-    """Configures and returns a logger instance with console and rotating file handlers."""
-    # Create log directory if it does not exist
-    log_path = Path(log_dir)
-    log_path.mkdir(parents=True, exist_ok=True)
-    full_log_path = log_path / log_file
-
+    """Configure and return a centralized logger instance."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Prevent duplicate handlers if called multiple times
-    if logger.hasHandlers():
+    if logger.handlers:
         logger.handlers.clear()
 
-    # Standard log formatting
-    log_format = logging.Formatter(
-        "%(asctime)s - %(name)s - [%(levelname)s] - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    # Stream handler for console output
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(log_format)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(level)
+    console_handler.setFormatter(ColoredConsoleFormatter())
     logger.addHandler(console_handler)
 
-    # Rotating file handler to manage log storage
-    file_handler = RotatingFileHandler(
-        full_log_path,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(log_format)
-    logger.addHandler(file_handler)
+    if log_file:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setLevel(level)
+        file_formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
 
     return logger
-
-
-if __name__ == "__main__":
-    app_logger = setup_logger()
-    app_logger.info("Logger configured and ready for automation tasks.")
-    app_logger.warning("This is a sample warning message.")
