@@ -1,33 +1,35 @@
-from typing import Final, Dict, Any
+import os
+from pathlib import Path
 
-# Configuration constants for automation-tool-64
-DEFAULT_TIMEOUT: Final[int] = 30
-MAX_RETRIES: Final[int] = 3
+# Base application paths
+BASE_DIR = Path(__file__).resolve().parent
+LOG_DIR = BASE_DIR / "logs"
+DATA_DIR = BASE_DIR / "data"
 
-# Environment mapping settings
-ENV_VAR_PREFIX: Final[str] = "AT64_"
+# Ensure required directories exist
+for directory in [LOG_DIR, DATA_DIR]:
+    directory.mkdir(exist_ok=True)
 
-# Supported operation types
-OPERATION_MODES: Final[list[str]] = ["sync", "async", "batch"]
+# Environment configuration keys
+ENV_PREFIX = "AT64"
+DEFAULT_TIMEOUT = 30
+MAX_RETRIES = 3
 
-# Default logging configuration
-LOG_FORMAT: Final[str] = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-LOG_LEVEL: Final[str] = "INFO"
+# Supported file extensions
+SUPPORTED_EXTENSIONS = {".json", ".yaml", ".yml", ".csv"}
 
-# System status codes
-STATUS_SUCCESS: Final[int] = 0
-STATUS_FAILURE: Final[int] = 1
+# Status codes for automation operations
+STATUS_SUCCESS = 0
+STATUS_WARNING = 1
+STATUS_ERROR = 2
 
-# API request configuration
-HEADERS: Final[Dict[str, str]] = {
-    "Content-Type": "application/json",
-    "User-Agent": "automation-tool-64-agent"
-}
+# Timing constants in seconds
+RETRY_DELAY = 2.0
+REQUEST_TIMEOUT = 10.0
 
-def get_app_metadata() -> Dict[str, Any]:
-    """Returns the default application metadata configuration."""
-    return {
-        "timeout": DEFAULT_TIMEOUT,
-        "retries": MAX_RETRIES,
-        "modes": OPERATION_MODES
-    }
+# User-agent configuration
+USER_AGENT = "automation-tool-64/1.0.0 (compatible; internal-task-runner)"
+
+def get_full_path(filename: str) -> Path:
+    """Helper to resolve path within the project directory."""
+    return BASE_DIR / filename
