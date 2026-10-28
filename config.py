@@ -1,25 +1,29 @@
+import json
 import os
-from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
-class AppConfig:
-    """Centralized configuration management for automation-tool-64."""
+DEFAULT_CONFIG = {
+    "timeout": 30,
+    "retries": 3,
+    "log_level": "INFO",
+    "enabled": True
+}
 
-    def __init__(self) -> None:
-        self.base_dir: Path = Path(__file__).resolve().parent
-        self.env: str = os.getenv("APP_ENV", "production")
-        self.log_level: str = os.getenv("LOG_LEVEL", "INFO")
-        self.timeout: int = int(os.getenv("APP_TIMEOUT", "30"))
+def load_config(config_path: str = "config.json") -> Dict[str, Any]:
+    """Loads configuration from file with fallback to defaults."""
+    config = DEFAULT_CONFIG.copy()
 
-    def get_settings(self) -> Dict[str, Any]:
-        """Return dict representation of current settings."""
-        return {
-            "env": self.env,
-            "log_level": self.log_level,
-            "timeout": self.timeout,
-            "base_path": str(self.base_dir)
-        }
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                user_config = json.load(f)
+                config.update(user_config)
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: could not load config file: {e}. Using defaults.")
+    
+    return config
 
-def load_config() -> AppConfig:
-    """Factory function to instantiate AppConfig."""
-    return AppConfig()
+if __name__ == "__main__":
+    # Example usage for automation-tool-64
+    current_config = load_config()
+    print(f"Active configuration: {current_config}")
