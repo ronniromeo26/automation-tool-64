@@ -1,29 +1,53 @@
-import time
-import functools
-import logging
-from typing import Callable, Any
+"""Data handling utilities for automation-tool-64."""
 
-logger = logging.getLogger(__name__)
+from typing import Any, Dict, List
 
-def retry_operation(max_attempts: int = 3, delay: float = 1.0):
-    """Decorator for retrying network operations with exponential backoff."""
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception = None
-            current_delay = delay
-            
-            for attempt in range(1, max_attempts + 1):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
-                    logger.warning(f"Attempt {attempt} failed: {e}. Retrying...")
-                    if attempt < max_attempts:
-                        time.sleep(current_delay)
-                        current_delay *= 2
-            
-            logger.error(f"Operation failed after {max_attempts} attempts.")
-            raise last_exception
-        return wrapper
-    return decorator
+
+def flatten_dict(
+    data: Dict[str, Any], parent_key: str = "", sep: str = "."
+) -> Dict[str, Any]:
+    """Flatten a nested dictionary structure using delimited keys.
+
+    Args:
+        data: The nested dictionary to flatten.
+        parent_key: The base key prefix for recursion.
+        sep: The separator string between nested keys.
+
+    Returns:
+        A single-level dictionary with flattened key paths.
+    """
+    items: List[tuple] = []
+    for key, value in data.items():
+        new_key = f"{parent_key}{sep}{key}" if parent_key else key
+        if isinstance(value, dict) and value:
+            items.extend(flatten_dict(value, new_key, sep=sep).items())
+        else:
+            items.append((new_key, value))
+    return dict(items)
+
+
+def clean_dict(
+    data: Dict[str, Any], drop_none: bool = True, drop_empty_str: bool = False
+) -> Dict[str, Any]:
+    """Recursively remove unwanted key-value pairs from a dictionary.
+
+    Args:
+        data: Input dictionary to clean.
+        drop_none: Remove keys where value is None.
+        drop_empty_str: Remove keys where value is an empty string.
+
+    Returns:
+        A new cleaned dictionary.
+    """
+    cleaned = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            value = clean_dict(value, drop_none=drop_none, drop_empty_str=drop_empty_str)
+
+        if drop_none and value is None:
+            continue
+        if drop_empty_str and value == "":
+            continue
+
+        cleaned[key] = value
+    return cleaned
