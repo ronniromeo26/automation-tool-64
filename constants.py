@@ -1,35 +1,35 @@
 import os
 from pathlib import Path
 
-# Base application paths
+# Base application directories
 BASE_DIR = Path(__file__).resolve().parent
 LOG_DIR = BASE_DIR / "logs"
-DATA_DIR = BASE_DIR / "data"
+TEMP_DIR = BASE_DIR / "temp"
 
-# Ensure required directories exist
-for directory in [LOG_DIR, DATA_DIR]:
-    directory.mkdir(exist_ok=True)
-
-# Environment configuration keys
-ENV_PREFIX = "AT64"
+# Configuration settings
 DEFAULT_TIMEOUT = 30
 MAX_RETRIES = 3
+CHUNK_SIZE = 1024 * 8
 
-# Supported file extensions
-SUPPORTED_EXTENSIONS = {".json", ".yaml", ".yml", ".csv"}
+# Supported file extensions for automation
+SUPPORTED_EXTENSIONS = {'.txt', '.json', '.csv', '.yaml'}
 
-# Status codes for automation operations
-STATUS_SUCCESS = 0
-STATUS_WARNING = 1
-STATUS_ERROR = 2
+# Environment specific keys
+API_KEY_ENV = "AUTOMATION_API_KEY"
+DB_CONNECTION_STR = os.getenv("DB_URL", "sqlite:///default.db")
 
-# Timing constants in seconds
-RETRY_DELAY = 2.0
-REQUEST_TIMEOUT = 10.0
+# Logging format and levels
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+LOG_LEVEL = "INFO"
 
-# User-agent configuration
-USER_AGENT = "automation-tool-64/1.0.0 (compatible; internal-task-runner)"
+# Task processing constraints
+CONCURRENT_TASKS = 4
+IDLE_THRESHOLD_SECONDS = 300
 
-def get_full_path(filename: str) -> Path:
-    """Helper to resolve path within the project directory."""
-    return BASE_DIR / filename
+def ensure_directories():
+    """Initialize application filesystem structure."""
+    for directory in [LOG_DIR, TEMP_DIR]:
+        directory.mkdir(parents=True, exist_ok=True)
+
+if __name__ == "__main__":
+    ensure_directories()
