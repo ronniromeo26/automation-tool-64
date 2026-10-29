@@ -1,39 +1,44 @@
+import time
+import functools
 import logging
-from typing import Any, Optional
 
+# Configure basic logger for automation-tool-64
 logger = logging.getLogger(__name__)
 
-class ValidationError(Exception):
-    """Custom exception for input validation failures."""
-    pass
-
-def validate_input_config(data: Any) -> bool:
-    """Validates configuration dictionary structure and values."""
-    if not isinstance(data, dict):
-        logger.error(f"Invalid configuration type: {type(data).__name__}")
-        raise ValidationError("Configuration must be a dictionary")
-
-    required_keys = ['id', 'path', 'retries']
-    for key in required_keys:
-        if key not in data:
-            logger.warning(f"Missing required config key: {key}")
-            raise ValidationError(f"Missing required key: {key}")
-
-    if not isinstance(data.get('retries'), int) or data['retries'] < 0:
-        logger.error("Invalid retry configuration detected")
-        raise ValidationError("Retries must be a non-negative integer")
-
-    return True
-
-def safe_path_access(path: Optional[str]) -> str:
-    """Sanitizes and validates filesystem paths."""
-    if not path or not isinstance(path, str):
-        logger.debug("Path access denied: empty or invalid path type")
-        return "/tmp/default"
+def retry_network_op(retries=3, delay=2, backoff=2):
+    """
+    Decorator to retry network-bound operations with exponential backoff.
     
-    # Prevent traversal attempts
-    if '..' in path or path.startswith('/'):
-        logger.warning(f"Security risk detected in path: {path}")
-        raise ValidationError("Path traversal attempt or invalid absolute path")
+    Args:
+        retries: Number of attempts to make.
+        delay: Initial sleep duration in seconds.
+        backoff: Multiplier for the delay after each failure.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            last_exception = None
 
-    return path.strip()
+            for attempt in range(1, retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    logger.warning(f"Attempt {attempt} failed: {e}")
+                    if attempt < retries:
+                        time.sleep(current_delay)
+                        current_delay *= backoff
+            
+            logger.error(f"Final attempt failed after {retries} retries")
+            raise last_exception
+        return wrapper
+    return decorator
+
+@retry_network_op(retries=3, delay=1)
+def example_network_call(url):
+    """
+    Placeholder for actual network request logic.
+    """
+    # Example: raise Exception("Connection Timeout")
+    return f"Successfully connected to {url}"
