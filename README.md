@@ -1,48 +1,58 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # automation-tool-64
 
-`automation-tool-64` is a lightweight, high-performance Python utility designed to streamline repetitive system tasks through configurable YAML workflows. It enables developers to orchestrate local processes, file operations, and API triggers without the overhead of heavy automation frameworks.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+`automation-tool-64` is a lightweight Python engine designed to streamline recurring system workflows and background processing tasks. It combines asynchronous event scheduling with native file system monitoring to eliminate boilerplate code from your operational pipelines.
 
 ## Features
 
-*   **YAML-Driven Orchestration**: Define complex task sequences in human-readable configuration files for repeatable execution.
-*   **Parallel Process Management**: Execute multiple background sub-processes concurrently with real-time stream logging.
-*   **Built-in Rate Limiter**: Prevent system saturation by enforcing configurable delays and concurrency caps on batch operations.
-*   **Cross-Platform Compatibility**: Native support for POSIX-compliant systems and Windows, ensuring consistent task behavior across environments.
+- **Asynchronous Task Scheduler:** Execute recurring jobs and cron-like routines using non-blocking `asyncio` loops.
+- **File System Watchers:** Trigger custom handlers instantly upon file creation, modification, or deletion within target directories.
+- **Webhook Dispatcher:** Send structured JSON payloads to Slack, Discord, or custom HTTP endpoints on task state changes.
+- **YAML Pipeline Definitions:** Declare complex multi-step workflows, retry logic, and dependencies in simple configuration files.
 
 ## Installation
 
-Ensure you have Python 3.8+ installed. Clone the repository and install the dependencies:
+Install the package via `pip`:
+
+```bash
+pip install automation-tool-64
+```
+
+Alternatively, build directly from the source repository:
 
 ```bash
 git clone https://github.com/Developer/automation-tool-64.git
 cd automation-tool-64
-pip install -r requirements.txt
+pip install -e .
 ```
 
-## Usage
+## Quick Start
 
-Create a `tasks.yaml` file in your working directory to define your automation sequence:
+Create a script named `app.py` to monitor a directory and log automated tasks:
 
-```yaml
-tasks:
-  - name: "Cleanup"
-    command: "rm -rf ./tmp/*"
-  - name: "Deploy"
-    command: "python deploy.py --env production"
+```python
+from automation_64 import AutomationEngine, TaskContext
+
+app = AutomationEngine()
+
+@app.on_file_change(path="./data", pattern="*.csv")
+async def process_new_csv(ctx: TaskContext):
+    print(f"Detected modification in: {ctx.event_path}")
+    # Run data processing steps here
+
+@app.schedule(interval_seconds=300)
+async def periodic_cleanup(ctx: TaskContext):
+    print("Running scheduled 5-minute cleanup routine...")
+
+if __name__ == "__main__":
+    app.run()
 ```
 
-Run the tool using the CLI:
+Run the application:
 
 ```bash
-python main.py --config tasks.yaml --verbose
-```
-
-For a full list of configuration parameters and flags, run:
-
-```bash
-python main.py --help
+python app.py
 ```
 
 ## License
