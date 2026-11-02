@@ -1,37 +1,33 @@
 import logging
-import sys
-from pathlib import Path
+from logging.handlers import RotatingFileHandler
+import os
 
-def setup_logger(name: str, log_file: str = "automation.log", level: int = logging.INFO) -> logging.Logger:
-    """Configures a standardized logger for automation-tool-64."""
+def setup_logger(name: str, log_file: str = 'automation.log') -> logging.Logger:
+    """Initializes a rotating file logger for the application."""
     logger = logging.getLogger(name)
-    logger.setLevel(level)
+    logger.setLevel(logging.INFO)
 
     # Prevent duplicate handlers if re-initialized
-    if not logger.handlers:
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+    if logger.hasHandlers():
+        logger.handlers.clear()
 
-        # Console output handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+    # Rotation settings: 5MB per file, keep 3 backups
+    handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=5 * 1024 * 1024, 
+        backupCount=3
+    )
 
-        # File output handler
-        log_path = Path(log_file)
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-    return logger
-
-def get_log_summary(log_file: str) -> str:
-    """Reads and returns the tail of the log file."""
-    path = Path(log_file)
-    if not path.exists():
-        return "No log file found."
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    handler.setFormatter(formatter)
     
-    with open(path, "r") as f:
-        lines = f.readlines()[-10:]
-    return "".join(lines)
+    logger.addHandler(handler)
+    
+    # Optional console output for development
+    console = logging.StreamHandler()
+    console.setFormatter(formatter)
+    logger.addHandler(console)
+    
+    return logger
