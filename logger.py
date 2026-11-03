@@ -1,57 +1,60 @@
 import logging
+import os
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
+from typing import Optional
 
-DEFAULT_LOG_DIR = Path("logs")
+DEFAULT_LOG_DIR = "logs"
 DEFAULT_LOG_FILE = "automation.log"
-MAX_LOG_SIZE = 5 * 1024 * 1024  # 5 MB
-BACKUP_COUNT = 3
+MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+BACKUP_COUNT = 5
 
 
 def setup_logger(
     name: str = "automation_tool",
+    log_dir: str = DEFAULT_LOG_DIR,
     log_file: str = DEFAULT_LOG_FILE,
-    log_dir: Path = DEFAULT_LOG_DIR,
     level: int = logging.INFO,
-    max_bytes: int = MAX_LOG_SIZE,
+    max_bytes: int = MAX_BYTES,
     backup_count: int = BACKUP_COUNT,
+    console_output: bool = True,
 ) -> logging.Logger:
-    """Configures and returns a logger instance with console and rotating file output."""
+    """Configures and returns a logger with rotating file and optional console handlers."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Prevent duplicate handlers if setup is called multiple times
-    if logger.handlers:
+    # Prevent adding duplicate handlers if logger is re-initialized
+    if logger.hasHandlers():
         return logger
 
-    # Ensure target logging directory exists
-    log_dir = Path(log_dir)
-    log_dir.mkdir(parents=True, exist_ok=True)
-    file_path = log_dir / log_file
-
-    # Shared log entry format
     formatter = logging.Formatter(
-        fmt="[%(asctime)s] [%(levelname)s] %(name)s: %(message)s",
+        fmt="%(asctime)s [%(levelname)s] %(name)s (%(filename)s:%(lineno)d): %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Standard output stream handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # Create log directory if non-existent
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, log_file)
 
-    # Rotating file handler for disk logging
+    # Set up rotating file handler
     file_handler = RotatingFileHandler(
-        filename=file_path,
+        filename=log_path,
         maxBytes=max_bytes,
         backupCount=backup_count,
         encoding="utf-8",
     )
+    file_handler.setLevel(level)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
+
+    # Optionally output to standard console stream
+    if console_output:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     return logger
 
 
-# Initialize default logger for module usage
-logger = setup_logger()
+# Main logger instance for default usage
+app_logger = setup_logger()
