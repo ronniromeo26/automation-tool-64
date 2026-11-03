@@ -1,33 +1,57 @@
 import logging
 from logging.handlers import RotatingFileHandler
-import os
+from pathlib import Path
 
-def setup_logger(name: str, log_file: str = 'automation.log') -> logging.Logger:
-    """Initializes a rotating file logger for the application."""
+DEFAULT_LOG_DIR = Path("logs")
+DEFAULT_LOG_FILE = "automation.log"
+MAX_LOG_SIZE = 5 * 1024 * 1024  # 5 MB
+BACKUP_COUNT = 3
+
+
+def setup_logger(
+    name: str = "automation_tool",
+    log_file: str = DEFAULT_LOG_FILE,
+    log_dir: Path = DEFAULT_LOG_DIR,
+    level: int = logging.INFO,
+    max_bytes: int = MAX_LOG_SIZE,
+    backup_count: int = BACKUP_COUNT,
+) -> logging.Logger:
+    """Configures and returns a logger instance with console and rotating file output."""
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(level)
 
-    # Prevent duplicate handlers if re-initialized
-    if logger.hasHandlers():
-        logger.handlers.clear()
+    # Prevent duplicate handlers if setup is called multiple times
+    if logger.handlers:
+        return logger
 
-    # Rotation settings: 5MB per file, keep 3 backups
-    handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=5 * 1024 * 1024, 
-        backupCount=3
-    )
+    # Ensure target logging directory exists
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    file_path = log_dir / log_file
 
+    # Shared log entry format
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        fmt="[%(asctime)s] [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
-    handler.setFormatter(formatter)
-    
-    logger.addHandler(handler)
-    
-    # Optional console output for development
-    console = logging.StreamHandler()
-    console.setFormatter(formatter)
-    logger.addHandler(console)
-    
+
+    # Standard output stream handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    # Rotating file handler for disk logging
+    file_handler = RotatingFileHandler(
+        filename=file_path,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
     return logger
+
+
+# Initialize default logger for module usage
+logger = setup_logger()
