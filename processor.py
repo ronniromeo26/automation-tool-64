@@ -1,43 +1,62 @@
-import os
-import logging
-from typing import List
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
+import time
 
-# Configure module logger
-logger = logging.getLogger(__name__)
 
-class DataProcessor:
-    """Handles cleanup and data normalization tasks."""
+@dataclass
+class TaskResult:
+    task_id: str
+    success: bool
+    data: Optional[Any] = None
+    error: Optional[str] = None
+    execution_time: float = 0.0
 
-    def __init__(self, directory: str, extensions: List[str]):
-        self.directory = directory
-        self.extensions = extensions
 
-    def get_target_files(self) -> List[str]:
-        """Identifies files matching the target extension list."""
-        if not os.path.exists(self.directory):
-            return []
-        return [f for f in os.listdir(self.directory) if f.endswith(tuple(self.extensions))]
+class BatchProcessor:
+    """Handles sequential execution of automation steps with result tracking."""
 
-    def perform_cleanup(self) -> int:
-        """Removes target files and returns deletion count."""
-        files = self.get_target_files()
-        count = 0
-        for filename in files:
-            file_path = os.path.join(self.directory, filename)
-            try:
-                os.remove(file_path)
-                count += 1
-            except OSError as e:
-                logger.error(f"failed to delete {filename}: {e}")
-        return count
+    def __init__(self, name: str = "default_processor"):
+        self.name = name
+        self.handlers: Dict[str, Callable[..., Any]] = {}
 
-    def reorganize(self, target_subdir: str) -> None:
-        """Moves existing files into a structured subdirectory."""
-        dest_path = os.path.join(self.directory, target_subdir)
-        os.makedirs(dest_path, exist_ok=True)
+    def register_handler(self, action: str, handler: Callable[..., Any]) -> None:
+        """Register a handler function for a specific action type."""
+        self.handlers[action] = handler
 
-        for filename in os.listdir(self.directory):
-            if filename != target_subdir:
-                source = os.path.join(self.directory, filename)
-                if os.path.isfile(source):
-                    os.rename(source, os.path.join(dest_path, filename))
+    def process_item(self, task_id: str, action: str, payload: Dict[str, Any]) -> TaskResult:
+        """Execute a registered action handler on a payload."""
+        if action not in self.handlers:
+            return TaskResult(
+                task_id=task_id,
+                success=False,
+                error=f"No handler registered for action: '{action}'"
+            )
+
+        start_time = time.perf_counter()
+        try:
+            result_data = self.handlers[action](payload)
+            elapsed = time.perf_counter() - start_time
+            return TaskResult(
+                task_id=task_id,
+                success=True,
+                data=result_data,
+                execution_time=round(elapsed, 4)
+            )
+        except Exception as err:
+            elapsed = time.perf_counter() - start_time
+            return TaskResult(
+                task_id=task_id,
+                success=False,
+                error=str(err),
+                execution_time=round(elapsed, 4)
+            )
+
+    def process_batch(self, items: List[Dict[str, Any]]) -> List[TaskResult]:
+        """Process a list of task items sequentially."""
+        results = []
+        for item in items:
+            task_id = item.get("id", "unknown")
+            action = item.get("action", "")
+            payload = item.get("payload", {})
+            results.append(self.process_item(task_id, action, payload))
+        return results
