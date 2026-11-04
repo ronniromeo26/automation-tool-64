@@ -1,60 +1,50 @@
-import logging
 import os
+import logging
 from logging.handlers import RotatingFileHandler
 from typing import Optional
-
-DEFAULT_LOG_DIR = "logs"
-DEFAULT_LOG_FILE = "automation.log"
-MAX_BYTES = 5 * 1024 * 1024  # 5 MB
-BACKUP_COUNT = 5
 
 
 def setup_logger(
     name: str = "automation_tool",
-    log_dir: str = DEFAULT_LOG_DIR,
-    log_file: str = DEFAULT_LOG_FILE,
+    log_file: str = "app.log",
     level: int = logging.INFO,
-    max_bytes: int = MAX_BYTES,
-    backup_count: int = BACKUP_COUNT,
-    console_output: bool = True,
+    max_bytes: int = 5 * 1024 * 1024,
+    backup_count: int = 3,
+    log_to_console: bool = True,
 ) -> logging.Logger:
-    """Configures and returns a logger with rotating file and optional console handlers."""
+    """Configures and returns a logger instance with file rotation capabilities."""
+    log_dir = os.path.dirname(log_file)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # Prevent adding duplicate handlers if logger is re-initialized
-    if logger.hasHandlers():
+    # Prevent duplicating handlers if re-initialized
+    if logger.handlers:
         return logger
 
     formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)s] %(name)s (%(filename)s:%(lineno)d): %(message)s",
+        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Create log directory if non-existent
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, log_file)
-
-    # Set up rotating file handler
+    # Rotating file handler configuration
     file_handler = RotatingFileHandler(
-        filename=log_path,
+        filename=log_file,
         maxBytes=max_bytes,
         backupCount=backup_count,
         encoding="utf-8",
     )
-    file_handler.setLevel(level)
     file_handler.setFormatter(formatter)
+    file_handler.setLevel(level)
     logger.addHandler(file_handler)
 
-    # Optionally output to standard console stream
-    if console_output:
+    # Optional console output stream
+    if log_to_console:
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
         console_handler.setFormatter(formatter)
+        console_handler.setLevel(level)
         logger.addHandler(console_handler)
 
     return logger
-
-
-# Main logger instance for default usage
-app_logger = setup_logger()
