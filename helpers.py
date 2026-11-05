@@ -1,59 +1,37 @@
-import json
-import re
-import time
-from pathlib import Path
-from typing import Any, Callable, Generator, List, Optional, TypeVar
+import os
+import shutil
+from typing import List, Optional
 
-T = TypeVar("T")
-
-
-def retry_operation(
-    func: Callable[..., T],
-    retries: int = 3,
-    delay: float = 1.0,
-    backoff: float = 2.0,
-) -> Callable[..., T]:
-    """Retry a function call with exponential backoff on failure."""
-
-    def wrapper(*args: Any, **kwargs: Any) -> T:
-        current_delay = delay
-        last_exception = None
-        for attempt in range(1, retries + 1):
+def clean_temp_directories(paths: List[str]) -> None:
+    """Removes temporary directories if they exist."""
+    for path in paths:
+        if os.path.exists(path) and os.path.isdir(path):
             try:
-                return func(*args, **kwargs)
-            except Exception as exc:
-                last_exception = exc
-                if attempt == retries:
-                    break
-                time.sleep(current_delay)
-                current_delay *= backoff
-        raise last_exception if last_exception else RuntimeError("Operation failed")
+                shutil.rmtree(path)
+            except OSError:
+                continue
 
-    return wrapper
+def consolidate_logs(source_dir: str, destination: str) -> None:
+    """Moves log files into a centralized archive."""
+    if not os.path.exists(destination):
+        os.makedirs(destination)
 
+    for item in os.listdir(source_dir):
+        if item.endswith('.log'):
+            source_path = os.path.join(source_dir, item)
+            dest_path = os.path.join(destination, item)
+            shutil.move(source_path, dest_path)
 
-def slugify(text: str) -> str:
-    """Convert text into a clean filename-friendly slug."""
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s-]", "", text)
-    return re.sub(r"[-\s]+", "_", text)
+def get_directory_size(path: str) -> int:
+    """Calculates total size of a directory tree."""
+    total_size = 0
+    for dirpath, _, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
 
-
-def chunk_list(items: List[T], chunk_size: int) -> Generator[List[T], None, None]:
-    """Yield successive n-sized chunks from a list."""
-    if chunk_size <= 0:
-        raise ValueError("chunk_size must be greater than zero")
-    for i in range(0, len(items), chunk_size):
-        yield items[i : i + chunk_size]
-
-
-def safe_load_json(file_path: str, default: Optional[Any] = None) -> Any:
-    """Safely load JSON data from a file path with fallback default."""
-    path = Path(file_path)
-    if not path.is_file():
-        return default
-    try:
-        with path.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return default
+def validate_path_exists(path: Optional[str]) -> bool:
+    """Checks if a provided path string is valid."""
+    return path is not None and os.path.exists(path)
