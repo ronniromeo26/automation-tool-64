@@ -1,52 +1,45 @@
-import concurrent.futures
-from functools import lru_cache
-from typing import Any, Callable, Dict, List, Generator
+import functools
+import time
+import logging
+from typing import Callable, Any, Dict
 
+# Configure logger for automation-tool-64 core
+logger = logging.getLogger(__name__)
 
-class CorePipeline:
-    """High-performance batch processing pipeline with cached routing and worker thread pooling."""
-
-    def __init__(self, max_workers: int = 4):
-        self.max_workers = max_workers
-        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+class PerformanceOptimizer:
+    """Utility class for function execution tracking and caching."""
+    _cache: Dict[str, Any] = {}
 
     @staticmethod
-    @lru_cache(maxsize=1024)
-    def _fast_transform_key(key: str) -> str:
-        """Cache key normalization to avoid redundant string processing overhead."""
-        return key.strip().lower().replace(" ", "_")
+    def memoize(func: Callable) -> Callable:
+        """Simple decorator to cache results of expensive operations."""
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            key = f"{func.__name__}:{args}:{frozenset(kwargs.items())}"
+            if key not in PerformanceOptimizer._cache:
+                PerformanceOptimizer._cache[key] = func(*args, **kwargs)
+            return PerformanceOptimizer._cache[key]
+        return wrapper
 
-    def _chunk_items(self, items: List[Any], chunk_size: int) -> Generator[List[Any], None, None]:
-        """Yield memory-efficient chunks from the input collection."""
-        for i in range(0, len(items), chunk_size):
-            yield items[i : i + chunk_size]
+    @staticmethod
+    def time_execution(func: Callable) -> Callable:
+        """Decorator to log execution time of core methods."""
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            start = time.perf_counter()
+            result = func(*args, **kwargs)
+            elapsed = time.perf_counter() - start
+            logger.debug(f"Method {func.__name__} took {elapsed:.4f}s")
+            return result
+        return wrapper
 
-    def execute_batch(self, items: List[Dict[str, Any]], handler: Callable[[Dict[str, Any]], Any], chunk_size: int = 50) -> List[Any]:
-        """Executes worker operations concurrently across optimized dataset chunks."""
-        results: List[Any] = []
-        chunks = list(self._chunk_items(items, chunk_size))
+# Example core processing component
+class AutomationCore:
+    def __init__(self, data: list):
+        self.data = data
 
-        futures = [
-            self._executor.submit(self._process_chunk, chunk, handler)
-            for chunk in chunks
-        ]
-
-        for future in concurrent.futures.as_completed(futures):
-            results.extend(future.result())
-
-        return results
-
-    def _process_chunk(self, chunk: List[Dict[str, Any]], handler: Callable[[Dict[str, Any]], Any]) -> List[Any]:
-        """Processes an individual chunk using cached transformations."""
-        chunk_results = []
-        for item in chunk:
-            normalized_item = {
-                self._fast_transform_key(k): v
-                for k, v in item.items()
-            }
-            chunk_results.append(handler(normalized_item))
-        return chunk_results
-
-    def shutdown(self) -> None:
-        """Cleanly release background thread pool allocation."""
-        self._executor.shutdown(wait=True)
+    @PerformanceOptimizer.time_execution
+    @PerformanceOptimizer.memoize
+    def process_heavy_payload(self, factor: int) -> int:
+        """Simulates a CPU intensive transformation task."""
+        return sum(x * factor for x in self.data) * sum(range(1000))
