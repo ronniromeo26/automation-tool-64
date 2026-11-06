@@ -1,60 +1,37 @@
-"""Input validation utilities for automation workflows."""
+import re
 
-from typing import Any, Dict, List, Union
-
-
-class ValidationError(Exception):
-    """Raised when data validation fails."""
-    pass
-
-
-def validate_task_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Validate and sanitize automation task configuration dictionaries.
+def validate_input(data):
+    """Validates input dictionary fields for automation-tool-64."""
+    required_fields = {'task_id', 'payload', 'priority'}
     
-    Handles edge cases like missing keys, invalid types, blank strings,
-    and out-of-bounds numerical parameters.
-    """
-    if not isinstance(config, dict):
-        raise ValidationError(f"Expected dict, got {type(config).__name__}")
-
-    if not config:
-        raise ValidationError("Task configuration cannot be empty")
-
-    sanitized = {}
+    if not isinstance(data, dict):
+        return False, "Input must be a dictionary"
     
-    # Validate task_name
-    task_name = config.get("task_name")
-    if not task_name or not isinstance(task_name, str):
-        raise ValidationError("Missing or invalid 'task_name'")
+    if not required_fields.issubset(data.keys()):
+        missing = required_fields - data.keys()
+        return False, f"Missing fields: {missing}"
     
-    sanitized_name = task_name.strip()
-    if not sanitized_name:
-        raise ValidationError("'task_name' cannot be blank or whitespace-only")
-    sanitized["task_name"] = sanitized_name
-
-    # Validate timeout
-    timeout = config.get("timeout", 30)
-    try:
-        timeout_val = float(timeout)
-        if timeout_val <= 0 or timeout_val > 3600:
-            raise ValidationError("Timeout must be between 0 and 3600 seconds")
-        sanitized["timeout"] = timeout_val
-    except (ValueError, TypeError):
-        raise ValidationError(f"Invalid timeout value: {timeout}")
-
-    # Validate retry codes
-    retries = config.get("retry_codes", [500, 502, 503, 504])
-    if not isinstance(retries, (list, tuple)):
-        raise ValidationError("'retry_codes' must be a list or tuple")
+    if not isinstance(data['task_id'], int) or data['task_id'] < 0:
+        return False, "task_id must be a positive integer"
     
-    clean_codes = []
-    for code in retries:
-        try:
-            int_code = int(code)
-            if 100 <= int_code <= 599:
-                clean_codes.append(int_code)
-        except (ValueError, TypeError):
-            continue  # Safely ignore unparseable status codes
-            
-    sanitized["retry_codes"] = clean_codes
-    return sanitized
+    if not isinstance(data['payload'], str) or len(data['payload']) > 1024:
+        return False, "payload must be a string under 1024 chars"
+    
+    if data['priority'] not in ['low', 'medium', 'high']:
+        return False, "priority must be low, medium, or high"
+    
+    return True, "success"
+
+def run_processing_loop(data_stream):
+    """Main processing loop with input validation integration."""
+    for item in data_stream:
+        is_valid, error = validate_input(item)
+        if not is_valid:
+            print(f"Validation error skipped: {error}")
+            continue
+        
+        process_item(item)
+
+def process_item(item):
+    """Stub for core processing logic."""
+    print(f"Processing valid task {item['task_id']}")
