@@ -1,37 +1,32 @@
-import os
-import shutil
-from typing import List, Optional
+import functools
+import time
+from typing import Callable, Any, Dict
 
-def clean_temp_directories(paths: List[str]) -> None:
-    """Removes temporary directories if they exist."""
-    for path in paths:
-        if os.path.exists(path) and os.path.isdir(path):
-            try:
-                shutil.rmtree(path)
-            except OSError:
-                continue
+# Cache for storing function results based on arguments
+_memoization_cache: Dict[tuple, Any] = {}
 
-def consolidate_logs(source_dir: str, destination: str) -> None:
-    """Moves log files into a centralized archive."""
-    if not os.path.exists(destination):
-        os.makedirs(destination)
+def memoize(func: Callable) -> Callable:
+    """Decorator to cache expensive function calls."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _memoization_cache:
+            _memoization_cache[key] = func(*args, **kwargs)
+        return _memoization_cache[key]
+    return wrapper
 
-    for item in os.listdir(source_dir):
-        if item.endswith('.log'):
-            source_path = os.path.join(source_dir, item)
-            dest_path = os.path.join(destination, item)
-            shutil.move(source_path, dest_path)
+def batch_process(items: list, batch_size: int = 100):
+    """Generator to yield chunks from a list for memory efficiency."""
+    for i in range(0, len(items), batch_size):
+        yield items[i:i + batch_size]
 
-def get_directory_size(path: str) -> int:
-    """Calculates total size of a directory tree."""
-    total_size = 0
-    for dirpath, _, filenames in os.walk(path):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            if not os.path.islink(fp):
-                total_size += os.path.getsize(fp)
-    return total_size
-
-def validate_path_exists(path: Optional[str]) -> bool:
-    """Checks if a provided path string is valid."""
-    return path is not None and os.path.exists(path)
+def timed_execution(func: Callable) -> Callable:
+    """Decorator to measure execution time of functions."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs) -> Any:
+        start_time = time.perf_counter()
+        result = func(*args, **kwargs)
+        end_time = time.perf_counter()
+        print(f"Execution of {func.__name__} took {end_time - start_time:.4f} seconds")
+        return result
+    return wrapper
