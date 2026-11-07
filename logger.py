@@ -1,50 +1,30 @@
-import os
 import logging
-from logging.handlers import RotatingFileHandler
-from typing import Optional
+import sys
+from pathlib import Path
 
+class AutomationLogger:
+    """Standardized logging utility for automation-tool-64."""
 
-def setup_logger(
-    name: str = "automation_tool",
-    log_file: str = "app.log",
-    level: int = logging.INFO,
-    max_bytes: int = 5 * 1024 * 1024,
-    backup_count: int = 3,
-    log_to_console: bool = True,
-) -> logging.Logger:
-    """Configures and returns a logger instance with file rotation capabilities."""
-    log_dir = os.path.dirname(log_file)
-    if log_dir and not os.path.exists(log_dir):
-        os.makedirs(log_dir, exist_ok=True)
+    def __init__(self, name: str = "automation-tool", log_file: str = "app.log"):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
+        
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
 
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+        # File handler configuration
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
 
-    # Prevent duplicating handlers if re-initialized
-    if logger.handlers:
-        return logger
-
-    formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    # Rotating file handler configuration
-    file_handler = RotatingFileHandler(
-        filename=log_file,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(formatter)
-    file_handler.setLevel(level)
-    logger.addHandler(file_handler)
-
-    # Optional console output stream
-    if log_to_console:
-        console_handler = logging.StreamHandler()
+        # Console handler configuration
+        console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(formatter)
-        console_handler.setLevel(level)
-        logger.addHandler(console_handler)
+        self.logger.addHandler(console_handler)
 
-    return logger
+    def get_logger(self) -> logging.Logger:
+        return self.logger
+
+# Global instance for project-wide access
+logger_instance = AutomationLogger().get_logger()
