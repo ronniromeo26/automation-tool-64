@@ -1,26 +1,32 @@
 class AutomationError(Exception):
-    """Base exception for all automation-tool-64 issues."""
-
-class ConfigurationError(AutomationError):
-    """Raised when tool configuration is invalid or missing."""
-
-class ExecutionError(AutomationError):
-    """Raised when an automation task fails during runtime."""
+    """Base exception for automation-tool-64."""
+    pass
 
 class ValidationError(AutomationError):
-    """Raised when input data fails internal integrity checks."""
+    """Raised when input validation fails."""
+    pass
 
-def handle_exception(e: Exception) -> None:
-    """Centralized error reporting and categorization."""
-    if isinstance(e, (ConfigurationError, ValidationError)):
-        print(f"Critical setup issue: {e}")
-    elif isinstance(e, ExecutionError):
-        print(f"Runtime failure encountered: {e}")
-    else:
-        print(f"Unexpected system error: {type(e).__name__} - {e}")
+class ExecutionError(AutomationError):
+    """Raised when an automation task fails."""
+    pass
 
-if __name__ == "__main__":
+class ConfigurationError(AutomationError):
+    """Raised when settings are invalid."""
+    pass
+
+class TimeoutError(AutomationError):
+    """Raised when a task exceeds time limit."""
+    pass
+
+def raise_if_none(value, message, exception_type=ValidationError):
+    """Utility to check for null values."""
+    if value is None:
+        raise exception_type(message)
+    return value
+
+def wrap_execution(func, *args, **kwargs):
+    """Wrapper to catch execution errors."""
     try:
-        raise ExecutionError("Failed to initialize process driver")
-    except AutomationError as err:
-        handle_exception(err)
+        return func(*args, **kwargs)
+    except Exception as e:
+        raise ExecutionError(f"Task failed: {str(e)}") from e
