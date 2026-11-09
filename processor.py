@@ -1,59 +1,72 @@
+import time
 import logging
-from typing import Any, Dict, List, Optional
+import urllib.error
+import urllib.request
+from typing import Any, Callable, Tuple, Type
 
 logger = logging.getLogger(__name__)
 
 
-def validate_item(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Validate incoming task payload before processing."""
-    if not isinstance(item, dict):
-        logger.warning(f"Invalid item type: expected dict, got {type(item).__name__}")
-        return None
+class NetworkProcessor:
+    """Executes network operations with configurable exponential backoff retries."""
 
-    task_id = item.get("id")
-    if not task_id or not isinstance(task_id, (int, str)):
-        logger.warning(f"Missing or invalid 'id' field in payload: {item}")
-        return None
+    def __init__(
+        self,
+        max_retries: int = 3,
+        backoff_factor: float = 1.5,
+        retry_exceptions: Tuple[Type[Exception], ...] = (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            TimeoutError,
+            ConnectionError,
+        ),
+    ):
+        self.max_retries = max_retries
+        self.backoff_factor = backoff_factor
+        self.retry_exceptions = retry_exceptions
 
-    action = item.get("action")
-    if not action or not isinstance(action, str):
-        logger.warning(f"Missing or invalid 'action' string for task {task_id}")
-        return None
+    def execute_with_retry(
+        self,
+        func: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any
+    ) -> Any:
+        """Executes a network callable with backoff retry logic."""
+        delay = 1.0
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                return func(*args, **kwargs)
+            except self.retry_exceptions as exc:
+                if attempt == self.max_retries:
+                    logger.error(
+                        "Operation failed after %d retries: %s",
+                        self.max_retries,
+                        exc,
+                    )
+                    raise exc
 
-    # Extract and normalize payload structure
-    payload = item.get("payload", {})
-    if not isinstance(payload, dict):
-        logger.warning(f"Invalid payload format for task {task_id}, using default")
-        payload = {}
-
-    return {
-        "id": str(task_id),
-        "action": action.strip().lower(),
-        "payload": payload,
-    }
+                sleep_time = delay * (self.backoff_factor ** (attempt - 1))
+                logger.warning(
+                    "Attempt %d/%d failed: %s. Retrying in %.2fs...",
+                    attempt,
+                    self.max_retries,
+                    exc,
+                    sleep_time,
+                )
+                time.sleep(sleep_time)
 
 
-def process_batch(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Process a batch of incoming items with input validation."""
-    results = []
-    
-    for raw_item in items:
-        # Validate input structure prior to execution
-        validated_item = validate_item(raw_item)
-        if not validated_item:
-            logger.warning("Skipping invalid item in batch loop")
-            continue
+def fetch_url_data(
+    url: str, timeout: float = 10.0, max_retries: int = 3
+) -> bytes:
+    """Helper function to fetch URL payload using network retry processor."""
+    processor = NetworkProcessor(max_retries=max_retries)
 
-        try:
-            logger.info(f"Processing task {validated_item['id']} ({validated_item['action']})")
-            status = "completed" if validated_item["action"] != "fail" else "failed"
-            results.append({
-                "id": validated_item["id"],
-                "status": status,
-                "data": validated_item["payload"]
-            })
-        except Exception as err:
-            logger.error(f"Error processing item {validated_item['id']}: {err}")
-            results.append({"id": validated_item["id"], "status": "error", "error": str(err)})
+    def _request():
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "AutomationTool64/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return response.read()
 
-    return results
+    return processor.execute_with_retry(_request)
