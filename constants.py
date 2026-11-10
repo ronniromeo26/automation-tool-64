@@ -1,27 +1,31 @@
-from typing import Final, Dict, Any
+import os
+from pathlib import Path
 
-# Application-wide configuration defaults
-DEFAULT_TIMEOUT: Final[int] = 30
-MAX_RETRIES: Final[int] = 3
+# Base application directories
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+LOG_DIR = BASE_DIR / "logs"
 
-# Supported file extensions for automation tasks
-SUPPORTED_EXTENSIONS: Final[tuple[str, ...]] = ('.json', '.yaml', '.yml', '.csv')
+# Ensure required directories exist
+for directory in [DATA_DIR, LOG_DIR]:
+    directory.mkdir(exist_ok=True)
 
-# Log message templates
-LOG_FORMAT: Final[str] = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# Configuration settings
+DEFAULT_TIMEOUT = 30
+MAX_RETRIES = 3
+CHUNK_SIZE = 1024 * 8
 
-def get_default_config() -> Dict[str, Any]:
-    """Retrieve the default automation configuration dictionary."""
-    return {
-        "timeout": DEFAULT_TIMEOUT,
-        "retries": MAX_RETRIES,
-        "extensions": list(SUPPORTED_EXTENSIONS)
-    }
+# Supported file extensions
+ALLOWED_EXTENSIONS = {".json", ".csv", ".txt"}
 
-# Environment status flags
-IS_PRODUCTION: Final[bool] = False
-DATABASE_URI: Final[str] = "sqlite:///automation.db"
+# Application identification
+APP_NAME = "automation-tool-64"
+VERSION = "1.2.0"
 
-# System constants for resource management
-CHUNK_SIZE: Final[int] = 1024 * 1024  # 1MB
-MAX_WORKERS: Final[int] = 4
+# Environment variables fallback
+API_KEY = os.getenv("APP_API_KEY", "default-secret-key")
+DEBUG_MODE = os.getenv("APP_DEBUG", "False").lower() in ("true", "1")
+
+# Formatting constants
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
