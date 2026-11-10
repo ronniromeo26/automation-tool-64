@@ -1,32 +1,38 @@
-import time
 import functools
-import requests
-from typing import Callable, Any
+import time
+from typing import Callable, Any, Dict
 
-def retry_operation(retries: int = 3, delay: float = 1.0, backoff: float = 2.0):
-    """
-    Decorator to retry network operations with exponential backoff.
-    """
-    def decorator(func: Callable):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            current_delay = delay
-            for attempt in range(retries):
-                try:
-                    return func(*args, **kwargs)
-                except (requests.exceptions.RequestException, ConnectionError) as e:
-                    if attempt == retries - 1:
-                        raise e
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-        return wrapper
-    return decorator
+# Cache dictionary for memoization of expensive computations
+_CACHE: Dict[tuple, Any] = {}
 
-@retry_operation(retries=3, delay=2.0)
-def fetch_url_data(url: str) -> dict:
-    """
-    Example network operation fetching JSON data.
-    """
-    response = requests.get(url, timeout=10)
-    response.raise_for_status()
-    return response.json()
+def memoize(func: Callable) -> Callable:
+    """Decorator to cache function results based on arguments."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        key = (func.__name__, args, frozenset(kwargs.items()))
+        if key not in _CACHE:
+            _CACHE[key] = func(*args, **kwargs)
+        return _CACHE[key]
+    return wrapper
+
+class DataHandler:
+    """Handles data processing with performance optimizations."""
+    
+    def __init__(self, buffer_size: int = 1000):
+        self.buffer_size = buffer_size
+        self.results = []
+
+    @memoize
+    def transform_data(self, value: int) -> int:
+        """Simulates a heavy computational task."""
+        time.sleep(0.1)
+        return value * 2
+
+    def batch_process(self, data_points: list) -> list:
+        """Process data using a generator to conserve memory."""
+        return [self.transform_data(val) for val in data_points]
+
+def clear_cache():
+    """Resets the handler cache to free memory."""
+    global _CACHE
+    _CACHE.clear()
