@@ -1,50 +1,53 @@
-import re
+import json
+import os
 import time
-from functools import wraps
-from typing import Any, Callable, Dict, Generator, List, Tuple
+from datetime import datetime
+from typing import Any, List, Dict, Optional, Callable
 
 
-def sanitize_filename(name: str, replacement: str = "_") -> str:
-    """Sanitize a string to make it safe for use as a filename."""
-    cleaned = re.sub(r'[\\/*?:	
-"<>|]', replacement, name)
-    cleaned = cleaned.strip(". ")
-    return cleaned or "unnamed"
+def generate_timestamp(fmt: str = "%Y%m%d_%H%M%S") -> str:
+    """Generate a formatted timestamp string for filenames or logs."""
+    return datetime.now().strftime(fmt)
 
 
-def chunk_list(items: List[Any], chunk_size: int) -> Generator[List[Any], None, None]:
-    """Yield successive chunks of specified size from a list."""
+def chunk_list(data: List[Any], chunk_size: int) -> List[List[Any]]:
+    """Split a list into smaller chunks of specified size."""
     if chunk_size <= 0:
         raise ValueError("chunk_size must be greater than zero")
-    for i in range(0, len(items), chunk_size):
-        yield items[i : i + chunk_size]
+    return [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
 
 
-def flatten_dict(data: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
-    """Flatten a nested dictionary into a single level dictionary with dotted keys."""
-    items: List[Tuple[str, Any]] = []
-    for k, v in data.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else str(k)
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
+def deep_merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merge two dictionaries, giving precedence to dict2."""
+    result = dict1.copy()
+    for key, value in dict2.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_merge_dicts(result[key], value)
         else:
-            items.append((new_key, v))
-    return dict(items)
+            result[key] = value
+    return result
 
 
-def retry_operation(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
-    """Decorator to retry a function if it raises an exception."""
-    def decorator(func: Callable):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            current_delay = delay
-            for attempt in range(1, max_attempts + 1):
-                try:
-                    return func(*args, **kwargs)
-                except Exception as err:
-                    if attempt == max_attempts:
-                        raise err
-                    time.sleep(current_delay)
-                    current_delay *= backoff
-        return wrapper
-    return decorator
+def safe_load_json(file_path: str, default: Optional[Any] = None) -> Any:
+    """Safely load JSON data from a file, returning default on error."""
+    if not os.path.exists(file_path):
+        return default
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return default
+
+
+def retry_operation(func: Callable, retries: int = 3, delay: float = 1.0, *args, **kwargs) -> Any:
+    """Retry a function execution multiple times with a specified delay."""
+    last_exception = None
+    for attempt in range(retries):
+        try:
+            return func(*args, **kwargs)
+        except Exception as exc:
+            last_exception = exc
+            if attempt < retries - 1:
+                time.sleep(delay)
+    if last_exception:
+        raise last_exception
