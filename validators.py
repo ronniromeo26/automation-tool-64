@@ -1,24 +1,32 @@
 import re
-from typing import Any, Optional
+from typing import Any, Dict
 
-def validate_email(email: str) -> bool:
-    """Checks if provided string is a valid email format."""
-    pattern = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
-    return bool(re.match(pattern, email))
+def validate_input_data(data: Dict[str, Any]) -> bool:
+    """Checks if input structure and types are valid."""
+    required_keys = ['task_id', 'payload', 'retries']
+    
+    # ensure all keys exist
+    if not all(key in data for key in required_keys):
+        return False
 
-def sanitize_input(data: Any) -> str:
-    """Strips whitespace and converts non-string types to string."""
-    if not isinstance(data, str):
-        data = str(data)
-    return data.strip()
+    # validate task_id format
+    if not isinstance(data['task_id'], str) or not re.match(r'^task-\d+$', data['task_id']):
+        return False
 
-def check_required_fields(data: dict, fields: list) -> list:
-    """Returns a list of missing keys from dictionary."""
-    return [field for field in fields if field not in data or not data[field]]
+    # validate payload constraints
+    if not isinstance(data['payload'], dict):
+        return False
 
-def normalize_numeric(value: Any) -> Optional[float]:
-    """Converts input to float or returns None if invalid."""
-    try:
-        return float(value)
-    except (ValueError, TypeError):
-        return None
+    # validate retry count range
+    if not isinstance(data['retries'], int) or not (0 <= data['retries'] <= 5):
+        return False
+
+    return True
+
+def process_main_loop(items: list):
+    """Entry point for validated batch processing."""
+    for item in items:
+        if validate_input_data(item):
+            print(f"Processing task: {item['task_id']}")
+        else:
+            print(f"Skipping invalid item: {item.get('task_id', 'unknown')}")
