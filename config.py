@@ -1,40 +1,29 @@
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-class AppConfig:
-    """Configuration management for automation-tool-64."""
-    
-    DEFAULT_SETTINGS = {
-        "log_level": "INFO",
-        "max_retries": 3,
-        "timeout": 30,
-        "data_dir": "./data"
-    }
+class ConfigLoader:
+    """Handles loading and validation of application settings."""
 
-    def __init__(self, env_prefix: str = "AT64_") -> None:
-        self.prefix = env_prefix
-        self.settings = self._load_env_settings()
+    def __init__(self, env: str = "development") -> None:
+        self.env: str = env
+        self.settings: Dict[str, Any] = {
+            "debug": True,
+            "timeout": 30,
+            "db_url": os.getenv("DATABASE_URL", "sqlite:///default.db")
+        }
 
-    def _load_env_settings(self) -> Dict[str, Any]:
-        """Load overrides from environment variables."""
-        config = self.DEFAULT_SETTINGS.copy()
-        for key in config:
-            env_key = f"{self.prefix}{key.upper()}"
-            value = os.getenv(env_key)
-            if value:
-                config[key] = type(config[key])(value)
-        return config
-
-    def get(self, key: str) -> Any:
-        """Retrieve configuration value by key."""
-        return self.settings.get(key, self.DEFAULT_SETTINGS.get(key))
+    def get(self, key: str, default: Optional[Any] = None) -> Any:
+        """Retrieve a setting value by key."""
+        return self.settings.get(key, default)
 
     def update(self, key: str, value: Any) -> None:
-        """Dynamic update of configuration settings."""
+        """Update or add a setting parameter."""
         self.settings[key] = value
 
-def get_config() -> AppConfig:
-    """Singleton-like accessor for application configuration."""
-    if not hasattr(get_config, "_instance"):
-        get_config._instance = AppConfig()
-    return get_config._instance
+    def validate(self) -> bool:
+        """Check for mandatory configuration keys."""
+        required_keys: list[str] = ["db_url", "timeout"]
+        return all(key in self.settings for key in required_keys)
+
+    def __repr__(self) -> str:
+        return f"ConfigLoader(env={self.env}, settings_count={len(self.settings)})"
