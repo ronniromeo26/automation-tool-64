@@ -6,24 +6,35 @@ class ConfigLoader:
 
     def __init__(self, env: str = "development") -> None:
         self.env: str = env
-        self.settings: Dict[str, Any] = {
-            "debug": True,
-            "timeout": 30,
-            "db_url": os.getenv("DATABASE_URL", "sqlite:///default.db")
-        }
+        self.settings: Dict[str, Any] = {}
+
+    def load_from_env(self, prefix: str = "APP_") -> Dict[str, Any]:
+        """Extract environment variables matching the provided prefix."""
+        extracted: Dict[str, Any] = {}
+        for key, value in os.environ.items():
+            if key.startswith(prefix):
+                config_key = key[len(prefix):].lower()
+                extracted[config_key] = self._parse_value(value)
+        self.settings.update(extracted)
+        return self.settings
+
+    def _parse_value(self, value: str) -> Any:
+        """Attempt to cast string environment values to appropriate types."""
+        if value.lower() in ("true", "yes", "1"):
+            return True
+        if value.lower() in ("false", "no", "0"):
+            return False
+        try:
+            return int(value)
+        except ValueError:
+            return value
 
     def get(self, key: str, default: Optional[Any] = None) -> Any:
-        """Retrieve a setting value by key."""
+        """Retrieve a configuration value by key."""
         return self.settings.get(key, default)
 
-    def update(self, key: str, value: Any) -> None:
-        """Update or add a setting parameter."""
-        self.settings[key] = value
-
-    def validate(self) -> bool:
-        """Check for mandatory configuration keys."""
-        required_keys: list[str] = ["db_url", "timeout"]
-        return all(key in self.settings for key in required_keys)
-
-    def __repr__(self) -> str:
-        return f"ConfigLoader(env={self.env}, settings_count={len(self.settings)})"
+def get_default_config() -> ConfigLoader:
+    """Factory function for a pre-configured loader instance."""
+    loader = ConfigLoader()
+    loader.load_from_env()
+    return loader
