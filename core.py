@@ -1,44 +1,51 @@
-import time
-import logging
-from typing import List, Dict, Any, Optional
+import concurrent.futures
+from functools import lru_cache
+from typing import Any, Dict, List, Tuple
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-class AutomationTask:
-    """Represents a discrete automation task to be executed."""
+class AutomationCore:
+    """Core execution engine for automation tasks with performance optimizations."""
 
-    def __init__(self, task_id: str, payload: Dict[str, Any]) -> None:
-        self.task_id = task_id
-        self.payload = payload
-        self.is_completed: bool = False
+    def __init__(self, max_workers: int = 4):
+        self.max_workers = max_workers
 
-    def execute(self) -> bool:
-        """Executes the task logic and marks as completed."""
-        try:
-            logger.info(f"Processing task: {self.task_id}")
-            time.sleep(0.1)
-            self.is_completed = True
-            return True
-        except Exception as e:
-            logger.error(f"Task {self.task_id} failed: {e}")
-            return False
+    @staticmethod
+    @lru_cache(maxsize=256)
+    def _memoized_transform(data_key: str, payload: str) -> str:
+        """Cached transformation for repeated automation payloads."""
+        return f"processed:{data_key}:{hash(payload)}"
 
-class AutomationEngine:
-    """Orchestrates multiple automation tasks."""
+    def execute_task(self, task_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a single task using fast payload lookup."""
+        key = str(payload.get("key", "default"))
+        data_str = str(payload.get("data", ""))
+        
+        result_hash = self._memoized_transform(key, data_str)
+        return {"task_id": task_id, "status": "completed", "result": result_hash}
 
-    def __init__(self, tasks: List[AutomationTask]) -> None:
-        self.tasks = tasks
+    def run_batch(
+        self, tasks: List[Tuple[str, Dict[str, Any]]]
+    ) -> List[Dict[str, Any]]:
+        """Run batch tasks concurrently using thread pool executor."""
+        if not tasks:
+            return []
 
-    def run_all(self) -> List[bool]:
-        """Runs all queued tasks and returns status list."""
-        results: List[bool] = []
-        for task in self.tasks:
-            success = task.execute()
-            results.append(success)
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_workers
+        ) as executor:
+            futures = [
+                executor.submit(self.execute_task, task_id, payload)
+                for task_id, payload in tasks
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as exc:
+                    results.append({"error": str(exc), "status": "failed"})
+
         return results
 
-if __name__ == "__main__":
-    queue = [AutomationTask("A1", {"data": 1}), AutomationTask("A2", {"data": 2})]
-    engine = AutomationEngine(queue)
-    engine.run_all()
+    def clear_cache(self) -> None:
+        """Flush memoization cache to free memory."""
+        self._memoized_transform.cache_clear()
