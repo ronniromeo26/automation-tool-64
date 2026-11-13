@@ -1,51 +1,44 @@
-import concurrent.futures
-from functools import lru_cache
-from typing import Any, Dict, List, Tuple
+import time
+from typing import List, Dict, Any, Callable
+from functools import wraps
+from concurrent.futures import ThreadPoolExecutor
 
+class CoreEngine:
+    """Core engine optimized for parallel batch processing and task caching."""
 
-class AutomationCore:
-    """Core execution engine for automation tasks with performance optimizations."""
-
-    def __init__(self, max_workers: int = 4):
+    def __init__(self, max_workers: int = 4, cache_size: int = 128):
         self.max_workers = max_workers
+        self.cache_size = cache_size
+        self._cache: Dict[str, Any] = {}
 
-    @staticmethod
-    @lru_cache(maxsize=256)
-    def _memoized_transform(data_key: str, payload: str) -> str:
-        """Cached transformation for repeated automation payloads."""
-        return f"processed:{data_key}:{hash(payload)}"
+    def memoize_task(self, func: Callable) -> Callable:
+        """Decorator to cache results of repetitive automation steps."""
+        cache = self._cache
 
-    def execute_task(self, task_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a single task using fast payload lookup."""
-        key = str(payload.get("key", "default"))
-        data_str = str(payload.get("data", ""))
-        
-        result_hash = self._memoized_transform(key, data_str)
-        return {"task_id": task_id, "status": "completed", "result": result_hash}
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            key = f"{func.__name__}:{args}:{sorted(kwargs.items())}"
+            if key not in cache:
+                cache[key] = func(*args, **kwargs)
+            return cache[key]
 
-    def run_batch(
-        self, tasks: List[Tuple[str, Dict[str, Any]]]
-    ) -> List[Dict[str, Any]]:
-        """Run batch tasks concurrently using thread pool executor."""
-        if not tasks:
+        return wrapper
+
+    def batch_process(self, items: List[Any], worker_fn: Callable, chunk_size: int = 10) -> List[Any]:
+        """Execute tasks in parallel chunks to optimize runtime and RAM usage."""
+        if not items:
             return []
 
         results = []
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_workers
-        ) as executor:
-            futures = [
-                executor.submit(self.execute_task, task_id, payload)
-                for task_id, payload in tasks
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    results.append(future.result())
-                except Exception as exc:
-                    results.append({"error": str(exc), "status": "failed"})
+        chunks = [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            for chunk in chunks:
+                futures = [executor.submit(worker_fn, item) for item in chunk]
+                results.extend([future.result() for future in futures])
 
         return results
 
     def clear_cache(self) -> None:
-        """Flush memoization cache to free memory."""
-        self._memoized_transform.cache_clear()
+        """Clear in-memory cache when system memory threshold is reached."""
+        self._cache.clear()
