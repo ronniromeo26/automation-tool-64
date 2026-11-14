@@ -1,44 +1,39 @@
-import time
-from typing import List, Dict, Any, Callable
-from functools import wraps
-from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
+from functools import lru_cache
+from typing import Any, Callable, Iterable, List
 
-class CoreEngine:
-    """Core engine optimized for parallel batch processing and task caching."""
 
-    def __init__(self, max_workers: int = 4, cache_size: int = 128):
+class AutomationCore:
+    """Core engine for automation-tool-64 with optimized execution pipeline."""
+
+    def __init__(self, max_workers: int = 4):
         self.max_workers = max_workers
-        self.cache_size = cache_size
-        self._cache: Dict[str, Any] = {}
 
-    def memoize_task(self, func: Callable) -> Callable:
-        """Decorator to cache results of repetitive automation steps."""
-        cache = self._cache
+    @staticmethod
+    @lru_cache(maxsize=256)
+    def _cached_transform(data_item: str) -> str:
+        """Optimized parsing and transformation with caching for repeated inputs."""
+        return data_item.strip().lower().replace("  ", " ")
 
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            key = f"{func.__name__}:{args}:{sorted(kwargs.items())}"
-            if key not in cache:
-                cache[key] = func(*args, **kwargs)
-            return cache[key]
-
-        return wrapper
-
-    def batch_process(self, items: List[Any], worker_fn: Callable, chunk_size: int = 10) -> List[Any]:
-        """Execute tasks in parallel chunks to optimize runtime and RAM usage."""
-        if not items:
-            return []
-
+    def process_batch(self, items: Iterable[Any], worker_fn: Callable[[Any], Any]) -> List[Any]:
+        """Process a batch of items in parallel using thread pool executor."""
         results = []
-        chunks = [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
-
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            for chunk in chunks:
-                futures = [executor.submit(worker_fn, item) for item in chunk]
-                results.extend([future.result() for future in futures])
-
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = [executor.submit(worker_fn, item) for item in items]
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as err:
+                    results.append({"status": "error", "message": str(err)})
         return results
 
-    def clear_cache(self) -> None:
-        """Clear in-memory cache when system memory threshold is reached."""
-        self._cache.clear()
+    def optimize_pipeline(self, raw_data: List[str]) -> List[str]:
+        """Deduplicate and transform data items using cached operations."""
+        seen = set()
+        processed = []
+        for item in raw_data:
+            cleaned = self._cached_transform(item)
+            if cleaned not in seen:
+                seen.add(cleaned)
+                processed.append(cleaned)
+        return processed
